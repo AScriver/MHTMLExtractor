@@ -1,0 +1,14 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+.vscode/
+output/
+SCRATCH
+benchmark.py
+*.mht
+*.mhtml
+
+# Ignore 'NOTES' file in a case-insensitive manner
+[Nn][Oo][Tt][Ee][Ss]
