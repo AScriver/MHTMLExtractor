@@ -20,25 +20,27 @@
 To use the MHTML Extractor, simply run the script and provide the necessary arguments:
 ```bash
 usage: mhtml_extractor.py yourFile.mhtml
-						  [-h] [--output_dir OUTPUT_DIR]
+                          [-h] [--output_dir OUTPUT_DIR]
                           [--buffer_size BUFFER_SIZE]
+                          [--clear_output_dir]
                           [--no_css] [--no_images] [--html_only]
                           
 
 positional arguments:
-  mhtml_path            Path to the MHTML document.
+  mhtml_path              Path to the MHTML document.
 
 optional arguments:
-  -h, --help            show this help message and exit
+  -h, --help              show this help message and exit
   --output_dir OUTPUT_DIR
-                        Output directory for the extracted files. Default is
-                        the current directory.
+                          Output directory for the extracted files. Default is
+                          the current directory.
   --buffer_size BUFFER_SIZE
-                        Buffer size for reading the MHTML file. Defaults to
-                        8192.
-  --no_css              If set, CSS files will not be extracted.
-  --no_images           If set, image files will not be extracted.
-  --html_only           If set, only HTML files will be extracted.
+                          Buffer size for reading the MHTML file. Defaults to
+                          8192.
+  --clear_output_dir      If set, delete the contents of the output directory.
+  --no_css                If set, CSS files will not be extracted.
+  --no_images             If set, image files will not be extracted.
+  --html_only             If set, only HTML files will be extracted.
 
 ```
 
@@ -51,7 +53,7 @@ python mhtml_extractor.py example.mhtml
 
 2. Extract files to a specific directory
 ```
-Extract files to a specific directory:
+python mhtml_extractor.py example.mhtml --output_dir=./output
 ```
 
 3. Extract only the HTML files:
@@ -76,7 +78,6 @@ python mhtml_extractor.py example.mhtml --html_only
 - **Dependencies**: The script uses Python's built-in libraries, so no additional installation is required. Make sure to have Python 3.x installed.
 
 - **Usage**: Use the script via the command line. It provides several optional arguments for customization, like specifying an output directory, setting the buffer size, or applying filters. Refer to the script's help (`--help` option) for detailed usage information.
-
 
 ## License
 
