@@ -183,10 +183,10 @@ class MHTMLExtractor:
             headers, body = part.split("\n\n", 1)
 
             # Extract various headers from the part
-            content_type_match = re.search(r"Content-Type: ([^\n]+)", headers)
-            content_transfer_encoding_match = re.search(r"Content-Transfer-Encoding: ([^\n]+)", headers)
-            content_location_match = re.search(r"Content-Location: ([^\n]+)", headers)
-            content_id_match = re.search(r"Content-ID: <([^>]+)>", headers)
+            content_type_match = re.search(r"Content-Type: ([^\n]+)", headers, re.IGNORECASE)
+            content_transfer_encoding_match = re.search(r"Content-Transfer-Encoding: ([^\n]+)", headers, re.IGNORECASE)
+            content_location_match = re.search(r"Content-Location: ([^\n]+)", headers, re.IGNORECASE)
+            content_id_match = re.search(r"Content-ID: <([^>]+)>", headers, re.IGNORECASE)
 
             if not content_type_match:
                 return
