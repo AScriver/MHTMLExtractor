@@ -180,7 +180,7 @@ class MHTMLExtractor:
             html_only (bool): If True, only HTML files will be extracted.
         """
         try:
-            headers, body = part.split("\n\n", 1)
+            headers, body = part.strip().split("\n\n", 1)
 
             # Extract various headers from the part
             content_type_match = re.search(r"Content-Type: ([^\n]+)", headers, re.IGNORECASE)
