@@ -352,9 +352,9 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", type=str, default=".", help="Output directory for the extracted files.")
     parser.add_argument("--buffer_size", type=int, default=8192, help="Buffer size for reading the MHTML file. Defaults to 8192.")
     parser.add_argument("--clear_output_dir", action="store_true", help="If set, clears the output directory before extraction.")
-    parser.add_argument("--no-css", action="store_true", help="If set, CSS files will not be extracted.")
-    parser.add_argument("--no-images", action="store_true", help="If set, image files will not be extracted.")
-    parser.add_argument("--html-only", action="store_true", help="If set, only HTML files will be extracted.")
+    parser.add_argument("--no_css", action="store_true", help="If set, CSS files will not be extracted.")
+    parser.add_argument("--no_images", action="store_true", help="If set, image files will not be extracted.")
+    parser.add_argument("--html_only", action="store_true", help="If set, only HTML files will be extracted.")
     # parser.add_argument("--main_only", action="store_true", help="If set, only the main HTML file will be extracted.")
 
     args = parser.parse_args()
