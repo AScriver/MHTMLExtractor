@@ -64,11 +64,13 @@ class MHTMLExtractor:
 
     def __init__(
         self, 
-        mhtml_path: Union[str, Path], 
-        output_dir: Union[str, Path], 
+        mhtml_path: Optional[Union[str, Path]] = None, 
+        output_dir: Union[str, Path] = "./extracted_mhtml", 
         buffer_size: int = DEFAULT_BUFFER_SIZE, 
         clear_output_dir: bool = False,
-        dry_run: bool = False
+        dry_run: bool = False,
+        create_in_memory_output: bool = False,
+        create_output_files: bool = True
     ) -> None:
         """
         Initialize the MHTMLExtractor class with enhanced validation and performance optimizations.
@@ -79,22 +81,27 @@ class MHTMLExtractor:
             buffer_size: Buffer size for reading the MHTML file. Auto-optimized if needed.
             clear_output_dir: If True, clears the output directory before extraction.
             dry_run: If True, only analyze the MHTML file without extracting files.
-            
+            create_in_memory_output: If True, creates dict representation of files into `self.extracted_contents`.
+            create_output_files: If True, output files will be generated into `output_dir`.
+
         Raises:
             FileNotFoundError: If the MHTML file doesn't exist.
             ValueError: If buffer_size is invalid.
             PermissionError: If unable to create/access output directory.
         """
         # Validate and convert paths
-        self.mhtml_path = Path(mhtml_path).resolve()
+        if mhtml_path is not None:
+            self.mhtml_path = Path(mhtml_path).resolve()
+            # Validate MHTML file exists
+            if not self.mhtml_path.exists():
+                raise FileNotFoundError(f"MHTML file not found: {self.mhtml_path}")
+            
+            if not self.mhtml_path.is_file():
+                raise ValueError(f"Path is not a file: {self.mhtml_path}")
+        else:
+            self.mhtml_path = None
+        
         self.output_dir = Path(output_dir).resolve()
-        
-        # Validate MHTML file exists
-        if not self.mhtml_path.exists():
-            raise FileNotFoundError(f"MHTML file not found: {self.mhtml_path}")
-        
-        if not self.mhtml_path.is_file():
-            raise ValueError(f"Path is not a file: {self.mhtml_path}")
         
         # Validate and optimize buffer size
         self.buffer_size = self._optimize_buffer_size(buffer_size)
@@ -106,9 +113,22 @@ class MHTMLExtractor:
         self.saved_html_files: List[str] = []
         self.stats = ExtractionStats()
         self.dry_run = dry_run
+        self.create_in_memory_output = create_in_memory_output
+        self.create_output_files = create_output_files
+        
+        # In-memory extraction storage
+        # Example content:
+        # {
+        #     'example.com_c5e95188a491577c4f22329fd339b744.html': {
+        #         'content_type': 'text/html',
+        #         'decoded_body': b'<!DOCTYPE html><html>...</html>'
+        #     },
+        #     ...
+        # }
+        self.extracted_contents: Dict[str, Dict[str, Union[str, bytes]]] = {}
         
         # Setup output directory
-        if not dry_run:
+        if not dry_run and self.create_output_files:
             self._setup_output_directory(clear_output_dir)
 
     def _optimize_buffer_size(self, buffer_size: int) -> int:
@@ -132,15 +152,16 @@ class MHTMLExtractor:
             buffer_size = MAX_BUFFER_SIZE
         
         # Auto-optimize based on file size
-        try:
-            file_size = self.mhtml_path.stat().st_size
-            # Use larger buffer for larger files, but cap it
-            optimal_size = min(max(file_size // 100, MIN_BUFFER_SIZE), MAX_BUFFER_SIZE)
-            if optimal_size != buffer_size:
-                logging.info(f"Optimizing buffer size from {buffer_size} to {optimal_size} based on file size")
-                return optimal_size
-        except OSError:
-            logging.warning("Could not determine file size for buffer optimization")
+        if self.mhtml_path is not None:
+            try:
+                file_size = self.mhtml_path.stat().st_size
+                # Use larger buffer for larger files, but cap it
+                optimal_size = min(max(file_size // 100, MIN_BUFFER_SIZE), MAX_BUFFER_SIZE)
+                if optimal_size != buffer_size:
+                    logging.info(f"Optimizing buffer size from {buffer_size} to {optimal_size} based on file size")
+                    return optimal_size
+            except OSError:
+                logging.warning("Could not determine file size for buffer optimization")
         
         return buffer_size
 
@@ -415,10 +436,17 @@ class MHTMLExtractor:
                 cid = "cid:" + content_id_match.group(1)
                 self.url_mapping[cid] = filename
 
-            # Write the content to a file (if not dry run)
-            if not self.dry_run:
+            # Store in memory if requested
+            if self.create_in_memory_output:
+                self.extracted_contents[filename] = {
+                    'content_type': content_type,
+                    'decoded_body': decoded_body
+                }
+
+            # Write the content to a file (if not dry run and file output enabled)
+            if not self.dry_run and self.create_output_files:
                 self._write_to_file(filename, content_type, decoded_body)
-            else:
+            elif self.dry_run:
                 logging.info(f"[DRY RUN] Would extract: {filename} ({content_type})")
                 
         except Exception as e:
@@ -672,7 +700,12 @@ class MHTMLExtractor:
         logging.info(f"  Extraction time: {self.stats.extraction_time:.2f} seconds")
         
         if not self.dry_run:
-            logging.info(f"  Output directory: {self.output_dir}")
+            if self.create_output_files:
+                near = ' (relative to script file)' if str(self.output_dir).startswith('./') else ''
+                logging.info(f"Extracted {self.extracted_count-1} files into {self.output_dir}{near}.")
+            
+            if self.create_in_memory_output:
+                logging.info(f"Extracted {self.extracted_count-1} files content into `extracted_contents` property.")
 
 
 if __name__ == "__main__":

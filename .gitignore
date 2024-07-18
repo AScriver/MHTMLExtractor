@@ -9,8 +9,6 @@ SCRATCH
 benchmark.py
 *.mht
 *.mhtml
-test/
 
 # Ignore 'NOTES' file in a case-insensitive manner
 [Nn][Oo][Tt][Ee][Ss]
-test.zip
