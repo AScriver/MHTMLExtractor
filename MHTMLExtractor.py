@@ -32,25 +32,40 @@ class MHTMLExtractor:
         url_mapping (dict): A dictionary mapping original URLs to new filenames.
     """
 
-    def __init__(self, mhtml_path, output_dir, buffer_size=8192, clear_output_dir=False):
+    def __init__(self, mhtml_path=None, output_dir='./extracted_mhtml', buffer_size=8192, clear_output_dir=False, create_in_memory_output=False, create_output_files=True):
         """
         Initialize the MHTMLExtractor class.
 
         Args:
             mhtml_path (str): Path to the MHTML document.
-            output_dir (str): Output directory for the extracted files.
+            output_dir (str, optional): Output directory for the extracted files. Default is `./extracted_mhtml`. It is relative to `MHTMLExtractor.py` file.
             buffer_size (int, optional): Buffer size for reading the MHTML file. Defaults to 8192.
             clear_output_dir (bool, optional): If True, clears the output directory before extraction. Defaults to False.
+            create_in_memory_output (bool, optional): If True, creates dict representation of files into `self.extracted_contents`.
+            create_output_files (bool, optional): If True, output files will be generated into `output_dir`.
         """
         self.mhtml_path = mhtml_path
         self.output_dir = output_dir
         self.buffer_size = buffer_size
+        self.create_in_memory_output = create_in_memory_output
+        self.create_output_files = create_output_files
         self.boundary = None
         self.extracted_count = 0
         self.url_mapping = {}  # Mapping between Content-Location and new filenames
         self.saved_html_files = []  # List to keep track of saved HTML filenames
 
-        self.ensure_directory_exists(self.output_dir, clear_output_dir)
+        # Example content:
+        # {
+        #     'example.com_c5e95188a491577c4f22329fd339b744.html': {
+        #         'content_type': 'text/html',
+        #         'decoded_body': b'<!DOCTYPE html><html>...</html>'
+        #     },
+        #     ...
+        # }
+        self.extracted_contents = {}
+
+        if self.create_output_files:
+            self.ensure_directory_exists(self.output_dir, clear_output_dir)
 
     def ensure_directory_exists(self, directory_path, clear=False):
         try:
@@ -219,8 +234,14 @@ class MHTMLExtractor:
                 cid = "cid:" + content_id_match.group(1)
                 self.url_mapping[cid] = filename
 
-            # Write the content to a file
-            self._write_to_file(filename, content_type, decoded_body)
+            if self.create_in_memory_output:
+                self.extracted_contents[filename] = {
+                    'content_type': content_type,
+                    'decoded_body': decoded_body
+                }
+            
+            if self.create_output_files:
+                self._write_to_file(filename, content_type, decoded_body)
         except Exception as e:
             logging.error(f"Error processing MHTML part: {e}")
 
@@ -260,28 +281,35 @@ class MHTMLExtractor:
         if html_only:
             return
 
+        if self.create_output_files:
+            self._update_html_links_file_handler(content, filepath, sorted_urls, hash_pattern, no_css=False, no_images=False)
+        else:
+            content = self.extracted_contents[filepath]['decoded_body'].decode()
+            self.extracted_contents[filepath]['decoded_body'] = content
+
+    def _update_html_links_file_handler(self, content, filepath, sorted_urls, hash_pattern, no_css=False, no_images=False):
         with open(filepath, "r", encoding="utf-8") as html_file:
             content = html_file.read()
 
-            # For each original URL, replace it with the new filename in the content
-            for original_url in sorted_urls:
-                new_filename = self.url_mapping[original_url]
+        # For each original URL, replace it with the new filename in the content
+        for original_url in sorted_urls:
+            new_filename = self.url_mapping[original_url]
 
-                # Skip updating links for CSS files if no_css flag is set
-                if no_css and new_filename.endswith(".css"):
-                    continue
+            # Skip updating links for CSS files if no_css flag is set
+            if no_css and new_filename.endswith(".css"):
+                continue
 
-                # Skip updating links for image files if no_images flag is set
-                if no_images and any(new_filename.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg"]):
-                    continue
+            # Skip updating links for image files if no_images flag is set
+            if no_images and any(new_filename.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg"]):
+                continue
 
-                matches = list(re.finditer(re.escape(original_url), content))
+            matches = list(re.finditer(re.escape(original_url), content))
 
-                # Replace the links in the content
-                for match in reversed(matches):
-                    if not hash_pattern.match(content, match.end()):
-                        content = content[: match.start()] + new_filename + content[match.end() :]
-
+            # Replace the links in the content
+            for match in reversed(matches):
+                if not hash_pattern.match(content, match.end()):
+                    content = content[: match.start()] + new_filename + content[match.end() :]
+            
         with open(filepath, "w", encoding="utf-8") as html_file:
             html_file.write(content)
 
@@ -291,12 +319,16 @@ class MHTMLExtractor:
         """
         temp_buffer_chunks = []  # Use a list to store chunks and join them when needed
 
+        is_stopped_with_brake = False
+
         try:
             with open(self.mhtml_path, "r", encoding="utf-8") as file:
                 # Continuously read from the MHTML file until no more content is left
                 while True:
                     chunk = file.read(self.buffer_size)
                     if not chunk:
+                        # Note: If you are using `break` inside a `try-except` block, `break` will cause exception. To prevent error message in this case, we are using `is_stopped_with_brake` helper variable. 
+                        is_stopped_with_brake = True
                         break
 
                     """
@@ -339,10 +371,17 @@ class MHTMLExtractor:
             for filename in self.saved_html_files:
                 filepath = os.path.join(self.output_dir, filename)
                 self._update_html_links(filepath, sorted_urls, hash_pattern)
-
-            logging.info(f"Extracted {self.extracted_count-1} files into {self.output_dir}")
         except Exception as e:
-            logging.error(f"Error during extraction: {e}")
+            if not is_stopped_with_brake:
+                logging.error(f"Error during extraction: {e}")
+
+        if self.create_output_files:
+            near = ' (relative to `MHTMLExtractor.py` file)' if str(self.output_dir).startswith('./') else ''
+            
+            logging.info(f"Extracted {self.extracted_count-1} files into {self.output_dir}{near}.")
+        
+        if self.create_in_memory_output:
+            logging.info(f"Extracted {self.extracted_count-1} files content into `extracted_contents` property.")
 
 
 if __name__ == "__main__":

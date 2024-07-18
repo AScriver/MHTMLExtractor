@@ -5,6 +5,7 @@
 ## Features
 
 - Extracts embedded files (e.g., CSS, images, JavaScript) from MHTML documents.
+- Saves extracted files into phisycal files or into in-memory Python dictionary.
 - Provides options to selectively skip extraction of certain file types.
 - Handles potential filename conflicts by appending a counter.
 - Efficient reading of large MHTML files through buffering.
@@ -15,7 +16,7 @@
 - Python 3.x
 - No external libraries are required.
 
-## Usage
+## Usage (CLI)
 
 To use the MHTML Extractor, simply run the script and provide the necessary arguments:
 ```bash
@@ -44,7 +45,23 @@ optional arguments:
 
 ```
 
-## Examples
+## Usage (Python)
+
+To use the MHTML Extractor, simply import the script and provide the necessary arguments:
+```py
+from MHTMLExtractor import MHTMLExtractor
+
+extractor = MHTMLExtractor(
+  mhtml_path='example.mhtml',
+  output_dir='path/to/output/dir',  # Optional, default is `./extracted_mhtml`. It is relative to `MHTMLExtractor.py` file.
+  create_in_memory_output=True,  # Optional, default is False. If True, `extractor.extracted_contents` will be created, what contains extracted data.
+  create_output_files=False  # Optional, default is True. If False, output files won't be created.
+)
+
+# ...
+```
+
+## Examples (CLI)
 
 1. Extract all files from an MHTML document:
 ```bash
@@ -59,6 +76,49 @@ python mhtml_extractor.py example.mhtml --output_dir=./output
 3. Extract only the HTML files:
 ```
 python mhtml_extractor.py example.mhtml --html_only
+```
+
+## Examples (Python):
+
+1. In-memory mode (files won't be created):
+```py
+from MHTMLExtractor import MHTMLExtractor
+
+extractor = MHTMLExtractor(
+  mhtml_path='example.mhtml',
+  create_in_memory_output=True,
+  create_output_files=False
+)
+extractor.extract()
+
+# Extracted content available in `extractor.extracted_contents` dict.
+for filename, details in extractor.extracted_contents.items():
+  print('=== Filename:', filename, '\n')
+  print('=== Content type:', details['content_type'], '\n')
+  print('=== Decoded content:', details['decoded_body'])
+
+  break
+```
+
+2. Both, in-memory mode and file mode:
+```py
+from MHTMLExtractor import MHTMLExtractor
+
+extractor = MHTMLExtractor(
+  mhtml_path='example.mhtml',
+  output_dir='/path/to/output/dir',  # Optional, default is `./extracted_mhtml`. It is relative to `MHTMLExtractor.py` file.
+  create_in_memory_output=True,
+  create_output_files=True,
+)
+extractor.extract()
+
+# Extracted content available in `extractor.extracted_contents` dict.
+for filename, details in extractor.extracted_contents.items():
+  print('=== Filename:', filename, '\n')
+  print('=== Content type:', details['content_type'], '\n')
+  print('=== Decoded content:', details['decoded_body'])
+
+  break
 ```
 
 ## Notes
