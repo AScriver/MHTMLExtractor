@@ -687,24 +687,15 @@ Examples:
     )
     
     parser.add_argument("mhtml_path", type=str, help="Path to the MHTML document.")
-    parser.add_argument("--output_dir", type=str, default=".", 
-                       help="Output directory for the extracted files. (default: current directory)")
-    parser.add_argument("--buffer_size", type=int, default=DEFAULT_BUFFER_SIZE, 
-                       help=f"Buffer size for reading the MHTML file. (default: {DEFAULT_BUFFER_SIZE})")
-    parser.add_argument("--clear_output_dir", action="store_true", 
-                       help="If set, clears the output directory before extraction.")
-    parser.add_argument("--no-css", action="store_true", 
-                       help="If set, CSS files will not be extracted.")
-    parser.add_argument("--no-images", action="store_true", 
-                       help="If set, image files will not be extracted.")
-    parser.add_argument("--html-only", action="store_true", 
-                       help="If set, only HTML files will be extracted.")
-    parser.add_argument("--dry-run", action="store_true", 
-                       help="If set, analyze the MHTML file without extracting files.")
-    parser.add_argument("--verbose", "-v", action="store_true", 
-                       help="Enable verbose logging output.")
-    parser.add_argument("--quiet", "-q", action="store_true", 
-                       help="Suppress all output except errors.")
+    parser.add_argument("--output_dir", type=str, default=".", help="Output directory for the extracted files. (default: current directory)")
+    parser.add_argument("--buffer_size", type=int, default=DEFAULT_BUFFER_SIZE, help=f"Buffer size for reading the MHTML file. (default: {DEFAULT_BUFFER_SIZE})")
+    parser.add_argument("--clear_output_dir", action="store_true", help="If set, clears the output directory before extraction.")
+    parser.add_argument("--no-css", action="store_true", help="If set, CSS files will not be extracted.")
+    parser.add_argument("--no-images", action="store_true", help="If set, image files will not be extracted.")
+    parser.add_argument("--html-only", action="store_true", help="If set, only HTML files will be extracted.")
+    parser.add_argument("--dry-run", action="store_true", help="If set, analyze the MHTML file without extracting files.")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging output.")
+    parser.add_argument("--quiet", "-q", action="store_true", help="Suppress all output except errors.")
 
     args = parser.parse_args()
 
