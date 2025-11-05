@@ -252,35 +252,44 @@ class MHTMLExtractor:
 
     def _should_skip_content(self, content_type: str, no_css: bool, no_images: bool,
                              allowed_types: Optional[List[str]] = None) -> bool:
+        type_map = {
+            "html": "html",
+            "css": "css",
+            "img": "image",
+            "image": "image",
+            "js": "javascript",
+            "javascript": "javascript",
+            "other": "other",
+        }
+
         if allowed_types:
-            type_map = {
-                "html": "html",
-                "css": "css",
-                "img": "image",
-                "image": "image",
-                "js": "javascript",
-                "javascript": "javascript",
-                "other": None,
-            }
-            normalized = [t.strip().lower() for t in allowed_types if t.strip()]
+            normalized: List[str] = []
+            for t in allowed_types:
+                t = (t or "").strip().lower()
+                if not t:
+                    continue
+                normalized.append(type_map.get(t, t))
+
             is_core = any(k in content_type for k in ("html", "css", "image", "javascript"))
             is_other = not is_core
+
             allowed = False
-            for kw in normalized:
-                if kw is None:
-                    if is_other:
+            if "other" in normalized and is_other:
+                allowed = True
+            if not allowed:
+                for kw in ("html", "css", "image", "javascript"):
+                    if kw in normalized and kw in content_type:
                         allowed = True
                         break
-                elif kw in content_type:
-                    allowed = True
-                    break
+
             if not allowed:
                 return True
 
         if no_css and "css" in content_type:
             return True
-        if no_images and ("image" in content_type):
+        if no_images and "image" in content_type:
             return True
+
         return False
 
     def _update_stats(self, content_type: str, decoded_body: Union[str, bytes]) -> None:
@@ -390,7 +399,7 @@ if __name__ == "__main__":
         type=str
     )
 
-    args = parser.parse_args([])
+    args = parser.parse_args()
 
     allowed_types = None
     if args.extract_types:
