@@ -30,7 +30,7 @@ To use the MHTML Extractor, simply run the script and provide the necessary argu
 
 ```bash
 usage: MHTMLExtractor.py [-h] [--output_dir OUTPUT_DIR] [--buffer_size BUFFER_SIZE] 
-                         [--clear_output_dir] [--no-css] [--no-images] [--html-only] 
+                         [--clear_output_dir] [--no-css] [--no-images] [--extract-types EXTRACT_TYPES] 
                          [--dry-run] [--verbose] [--quiet]
                          mhtml_path
 
@@ -46,7 +46,10 @@ optional arguments:
   --clear_output_dir      If set, clears the output directory before extraction.
   --no-css                If set, CSS files will not be extracted.
   --no-images             If set, image files will not be extracted.
-  --html-only             If set, only HTML files will be extracted.
+  --extract-types EXTRACT_TYPES
+                          Comma-separated logical categories to extract. Supported values:
+                          img (image), html, css, js (javascript), other.
+                          Examples: --extract-types img,html | --extract-types css,js
   --dry-run               If set, analyze the MHTML file without extracting files.
   --verbose, -v           Enable verbose logging output.
   --quiet, -q             Suppress all output except errors.
@@ -64,9 +67,9 @@ python MHTMLExtractor.py example.mhtml
 python MHTMLExtractor.py example.mhtml --output_dir ./extracted
 ```
 
-3. **Extract only HTML files**:
+3. **Extract specific types (e.g. only images and HTML)**:
 ```bash
-python MHTMLExtractor.py example.mhtml --html-only
+python MHTMLExtractor.py example.mhtml --extract-types img,html
 ```
 
 4. **Dry-run analysis** (preview without extracting):
@@ -80,6 +83,8 @@ python MHTMLExtractor.py example.mhtml --no-css --no-images
 ```
 
 6. **High-performance extraction with custom buffer**:
+> ⚠️ **Note:** If you use `--no-images` or `--no-css` together with `--extract-types`, the exclusion flags will still apply (e.g., `--no-images` will skip images even if `--extract-types` includes `img`).
+
 ```bash
 python MHTMLExtractor.py large_file.mhtml --buffer_size 65536 --verbose
 ```
@@ -168,6 +173,10 @@ Typical performance improvements over the original version:
 - **Memory Usage**: 60-80% reduction for large files
 - **Processing Speed**: 2-3x faster for files > 10MB
 - **String Operations**: 10x faster link replacement for large HTML files
+
+## Credits
+
+_Implementation assisted by ChatGPT (OpenAI) for code generation and documentation refinement._
 
 ## License
 
