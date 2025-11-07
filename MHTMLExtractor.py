@@ -13,6 +13,7 @@ from typing import Optional, Dict, List, Tuple, Union
 from pathlib import Path
 from dataclasses import dataclass
 import time
+import html
 
 # Constants
 DEFAULT_BUFFER_SIZE = 8192
@@ -539,8 +540,10 @@ class MHTMLExtractor:
                 if no_images and any(new_filename.endswith(ext) for ext in IMAGE_EXTENSIONS):
                     continue
 
+                # url may contain '&' and other html-special characters
+                html_escaped_url = html.escape(original_url)
                 # Use re.sub for more efficient replacement
-                escaped_url = re.escape(original_url)
+                escaped_url = re.escape(html_escaped_url)
                 content = re.sub(escaped_url, new_filename, content)
 
             # Only write if content changed
