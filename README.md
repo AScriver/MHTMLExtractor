@@ -24,7 +24,7 @@
 
 - Python 3.7+ (with type hint support)
 
-## Usage
+## Usage (CLI)
 
 To use the MHTML Extractor, simply run the script and provide the necessary arguments:
 
@@ -52,7 +52,22 @@ optional arguments:
   --quiet, -q             Suppress all output except errors.
 ```
 
-## Examples
+## Usage (Python)
+
+To use the MHTML Extractor, simply import the script and provide the necessary arguments:
+```py
+from MHTMLExtractor import MHTMLExtractor
+
+extractor = MHTMLExtractor(
+  mhtml_path='example.mhtml',
+  output_dir='path/to/output/dir',  # Optional, default is current directory (".")
+  create_in_memory_output=True,  # Optional, default is False. If True, `extractor.extracted_contents` will be created, what contains extracted data. Only available in Python API (not CLI).
+  create_output_files=False  # Optional, default is True. If False, output files won't be created.
+)
+```
+
+
+## Examples (CLI)
 
 1. **Extract all files** from an MHTML document:
 ```bash
@@ -84,63 +99,54 @@ python MHTMLExtractor.py example.mhtml --no-css --no-images
 python MHTMLExtractor.py large_file.mhtml --buffer_size 65536 --verbose
 ```
 
-## New Features
+## Examples (Python):
 
-### Dry-Run Mode
-Use `--dry-run` to analyze MHTML files without extracting them. This shows you:
-- What files would be extracted
-- File types and sizes
-- Extraction statistics
-- Performance metrics
+1. In-memory mode (files won't be created):
+```py
+from MHTMLExtractor import MHTMLExtractor
 
-### Enhanced Statistics
-The tool now provides comprehensive statistics including:
-- Number of files by type (HTML, CSS, images, other)
-- Total data size processed
-- Extraction time
-- Files skipped due to filters
+extractor = MHTMLExtractor(
+  mhtml_path='example.mhtml',
+  create_in_memory_output=True,
+  create_output_files=False
+)
+extractor.extract()
 
-### Improved Performance
-- **Auto-optimization**: Buffer size automatically optimized based on file size
-- **Memory efficiency**: Reduced memory usage for large files
-- **Faster processing**: Optimized string operations and regex patterns
+# Extracted content available in `extractor.extracted_contents` dict.
+for filename, details in extractor.extracted_contents.items():
+  print('=== Filename:', filename, '\n')
+  print('=== Content type:', details['content_type'], '\n')
+  print('=== Decoded content:', details['decoded_body'])
 
-### Better Error Handling
-- Detailed error messages with specific causes
-- Graceful handling of corrupted MHTML files
-- Input validation and permission checks
-- Proper exit codes for automation
+  break
+```
 
-## Code Quality Improvements
+2. Both, in-memory mode and file mode:
+```py
+from MHTMLExtractor import MHTMLExtractor
 
-- **Type hints**: Full type annotations for better IDE support and code safety
-- **Documentation**: Comprehensive docstrings for all methods
-- **Constants**: Extracted magic numbers to named constants
-- **Validation**: Input validation for all parameters
-- **Logging**: Configurable logging levels (quiet, normal, verbose)
-## Technical Details
+extractor = MHTMLExtractor(
+  mhtml_path='example.mhtml',
+  output_dir='/path/to/output/dir',  # Optional, default is current directory (".")
+  create_in_memory_output=True,
+  create_output_files=True,
+)
+extractor.extract()
 
-### Performance Optimizations
-- **Adaptive Buffering**: Buffer size automatically adjusted based on file size (1KB - 1MB range)
-- **Linear String Operations**: Uses list-join method instead of string concatenation for O(n) performance
-- **Efficient Regex**: Optimized regular expressions for content parsing and link updates
-- **Smart Processing**: Only processes complete MHTML parts to avoid partial data issues
+# Extracted content available in `extractor.extracted_contents` dict.
+for filename, details in extractor.extracted_contents.items():
+  print('=== Filename:', filename, '\n')
+  print('=== Content type:', details['content_type'], '\n')
+  print('=== Decoded content:', details['decoded_body'])
 
-### Enhanced Error Handling
-- **Input Validation**: Validates file existence, permissions, and parameter ranges
-- **Graceful Degradation**: Continues processing even if individual parts fail
-- **Specific Exceptions**: Different exception types for different error scenarios
-- **Detailed Logging**: Comprehensive error messages with context
-
-### Code Quality Features
-- **Type Safety**: Complete type hints using `typing` module
-- **Immutable Data**: Uses `@dataclass` for structured data with proper types
-- **Path Handling**: Uses `pathlib.Path` for robust cross-platform path operations
-- **Constants**: All magic numbers and strings extracted to named constants
+  break
+```
 
 ## Notes
 
 - **Purpose**: This script is designed to extract files (like images, CSS, and HTML content) from MHTML documents. MHTML is a web page archive format that's used to combine multiple resources from a web page into a single file.
+
+- **In-Memory Feature**: The `create_in_memory_output` feature is only available when using the Python API directly. It is not accessible via the command-line interface.
 
 - **Performance**: The script efficiently reads the MHTML file in adaptive chunks (auto-optimized from 1KB to 1MB) to handle even very large files without consuming excessive memory.
 
@@ -161,13 +167,6 @@ The tool now provides comprehensive statistics including:
 - **Dependencies**: The script uses only Python's built-in libraries, so no additional installation is required. Requires Python 3.7+ for type hint support.
 
 - **Cross-Platform**: Works on Windows, macOS, and Linux with proper path handling.
-
-## Performance Benchmarks
-
-Typical performance improvements over the original version:
-- **Memory Usage**: 60-80% reduction for large files
-- **Processing Speed**: 2-3x faster for files > 10MB
-- **String Operations**: 10x faster link replacement for large HTML files
 
 ## License
 
