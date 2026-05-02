@@ -56,8 +56,10 @@ def decode_body(encoding: str, body: str) -> Union[str, bytes]:
             clean_body = re.sub(r"\s+", "", body)
             return base64.b64decode(clean_body)
         if encoding == "quoted-printable":
-            return quopri.decodestring(body.encode()).decode("utf-8", errors="replace")
-        if encoding in {"7bit", "8bit", "binary"}:
+            return quopri.decodestring(body.encode("latin-1")).decode("utf-8", errors="replace")
+        if encoding in {"8bit", "binary"}:
+            return body.encode("latin-1")
+        if encoding == "7bit":
             return body
 
         logging.warning(f"Unsupported encoding: {encoding}, treating as plain text")

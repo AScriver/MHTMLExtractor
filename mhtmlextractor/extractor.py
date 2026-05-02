@@ -167,6 +167,21 @@ class MHTMLExtractor:
                 logging.warning(f"Could not remove {item}: {e}")
 
     @staticmethod
+    def _normalize_part_segment(part: str) -> str:
+        """Remove MIME boundary separator line breaks without trimming payload bytes."""
+        if part.startswith("\r\n"):
+            part = part[2:]
+        elif part.startswith("\n"):
+            part = part[1:]
+
+        if part.endswith("\r\n"):
+            part = part[:-2]
+        elif part.endswith("\n"):
+            part = part[:-1]
+
+        return part
+
+    @staticmethod
     def ensure_directory_exists(directory_path: Union[str, Path], clear: bool = False) -> None:
         """
         Legacy method for backward compatibility.
@@ -402,7 +417,7 @@ class MHTMLExtractor:
             else:
                 logging.info(f"Extracting from: {self.mhtml_path} to: {self.output_dir}")
 
-            with self.mhtml_path.open("r", encoding="utf-8", errors="replace") as file:
+            with self.mhtml_path.open("r", encoding="latin-1", newline="") as file:
                 while True:
                     chunk = file.read(self.buffer_size)
                     if not chunk:
@@ -423,11 +438,16 @@ class MHTMLExtractor:
 
                         for part in parts[:-1]:
                             if self.extracted_count > 0:
-                                self._process_part(part.strip(), no_css, no_images, html_only)
+                                self._process_part(
+                                    self._normalize_part_segment(part),
+                                    no_css,
+                                    no_images,
+                                    html_only,
+                                )
                             self.extracted_count += 1
 
                 if temp_buffer_chunks and self.boundary:
-                    remaining_part = "".join(temp_buffer_chunks).strip()
+                    remaining_part = self._normalize_part_segment("".join(temp_buffer_chunks))
                     if remaining_part and remaining_part != "--":
                         self._process_part(remaining_part, no_css, no_images, html_only)
 

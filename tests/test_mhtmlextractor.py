@@ -95,6 +95,34 @@ class LinkUpdateTests(unittest.TestCase):
             )
 
 
+class ExtractionTests(unittest.TestCase):
+    def test_binary_transfer_part_preserves_original_bytes(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            work_dir = Path(temp_dir)
+            output_dir = work_dir / "out"
+            mhtml_path = work_dir / "binary.mhtml"
+            location = "https://example.com/image.jpg"
+            payload = b"\xff\xd8\xff\xe0\r\nbinary-jpeg-data   "
+            boundary = b"issue8-boundary"
+            mhtml_path.write_bytes(
+                b'Content-Type: multipart/related; boundary="issue8-boundary"\r\n'
+                b"\r\n"
+                b"--" + boundary + b"\r\n"
+                b"Content-Type: image/jpeg\r\n"
+                b"Content-Transfer-Encoding: binary\r\n"
+                b"Content-Location: " + location.encode("ascii") + b"\r\n"
+                b"\r\n"
+                + payload
+                + b"\r\n--" + boundary + b"--\r\n"
+            )
+
+            extractor = MHTMLExtractor(mhtml_path=mhtml_path, output_dir=output_dir)
+            extractor.extract()
+
+            filename = hashed_filename(location, "image", ".jpg")
+            self.assertEqual((output_dir / filename).read_bytes(), payload)
+
+
 class CliTests(unittest.TestCase):
     def test_legacy_module_exports_package_extractor(self):
         self.assertIs(MHTMLExtractor, PackageMHTMLExtractor)
