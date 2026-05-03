@@ -144,6 +144,67 @@ class ExtractionTests(unittest.TestCase):
             filename = hashed_filename(location, "image", ".jpg")
             self.assertEqual((output_dir / filename).read_bytes(), payload)
 
+    def test_boundary_like_text_inside_body_is_not_treated_as_part_delimiter(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            work_dir = Path(temp_dir)
+            output_dir = work_dir / "out"
+            mhtml_path = work_dir / "inline-boundary.mhtml"
+            location = "https://example.com/index.html"
+            body = "Before inline --issue9-boundary marker after"
+            boundary = "issue9-boundary"
+            mhtml_content = (
+                'Content-Type: multipart/related; boundary="issue9-boundary"\r\n'
+                "\r\n"
+                f"--{boundary}\r\n"
+                "Content-Type: text/html\r\n"
+                f"Content-Location: {location}\r\n"
+                "\r\n"
+                f"{body}\r\n"
+                f"--{boundary}--\r\n"
+            )
+            mhtml_path.write_bytes(mhtml_content.encode("latin-1"))
+
+            extractor = MHTMLExtractor(mhtml_path=mhtml_path, output_dir=output_dir)
+            extractor.extract()
+
+            filename = hashed_filename(location, "index", ".html")
+            self.assertEqual((output_dir / filename).read_text(encoding="utf-8"), body)
+
+    def test_mime_delimiter_between_parts_is_not_treated_as_body_text(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            work_dir = Path(temp_dir)
+            output_dir = work_dir / "out"
+            mhtml_path = work_dir / "two-parts.mhtml"
+            boundary = "issue9-boundary"
+            html_location = "https://example.com/index.html"
+            css_location = "https://example.com/site.css"
+            html_body = "<html><head></head><body>page</body></html>"
+            css_body = "body { color: red; }"
+            mhtml_content = (
+                'Content-Type: multipart/related; boundary="issue9-boundary"\r\n'
+                "\r\n"
+                f"--{boundary}\r\n"
+                "Content-Type: text/html\r\n"
+                f"Content-Location: {html_location}\r\n"
+                "\r\n"
+                f"{html_body}\r\n"
+                f"--{boundary}\r\n"
+                "Content-Type: text/css\r\n"
+                f"Content-Location: {css_location}\r\n"
+                "\r\n"
+                f"{css_body}\r\n"
+                f"--{boundary}--\r\n"
+            )
+            mhtml_path.write_bytes(mhtml_content.encode("latin-1"))
+
+            extractor = MHTMLExtractor(mhtml_path=mhtml_path, output_dir=output_dir)
+            extractor.extract()
+
+            html_filename = hashed_filename(html_location, "index", ".html")
+            css_filename = hashed_filename(css_location, "site", ".css")
+            self.assertEqual((output_dir / html_filename).read_text(encoding="utf-8"), html_body)
+            self.assertEqual((output_dir / css_filename).read_text(encoding="utf-8"), css_body)
+
 
 class CliTests(unittest.TestCase):
     def test_legacy_module_exports_package_extractor(self):

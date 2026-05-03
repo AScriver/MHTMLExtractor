@@ -1,6 +1,7 @@
 """Core MHTML extraction workflow."""
 
 import logging
+import re
 import shutil
 import time
 from pathlib import Path
@@ -180,6 +181,14 @@ class MHTMLExtractor:
             part = part[:-1]
 
         return part
+
+    @staticmethod
+    def _split_boundary_segments(buffer: str, boundary: str) -> List[str]:
+        """Split only on MIME boundary delimiter lines."""
+        delimiter = re.compile(
+            rf"(?:^|\r?\n)--{re.escape(boundary)}(?:--)?[ \t]*(?:\r?\n|$)"
+        )
+        return delimiter.split(buffer)
 
     @staticmethod
     def ensure_directory_exists(directory_path: Union[str, Path], clear: bool = False) -> None:
@@ -437,7 +446,7 @@ class MHTMLExtractor:
 
                     if self.boundary:
                         joined_buffer = "".join(temp_buffer_chunks)
-                        parts = joined_buffer.split("--" + self.boundary)
+                        parts = self._split_boundary_segments(joined_buffer, self.boundary)
                         temp_buffer_chunks = [parts[-1]]
 
                         for part in parts[:-1]:
