@@ -12,6 +12,20 @@ from .constants import INVALID_FILENAME_CHARS
 from .headers import get_header_value
 
 
+# Python's mimetypes table may not map some obsolete or archive-common
+# MIME types, so keep extracted filenames useful.
+CONTENT_TYPE_EXTENSION_OVERRIDES = {
+    "application/javascript": ".js",
+    "application/ecmascript": ".js",
+    "application/x-javascript": ".js",
+    "text/ecmascript": ".js",
+    "text/jscript": ".js",
+    "text/x-javascript": ".js",
+    "application/ld+json": ".jsonld",
+    "application/font-woff": ".woff",
+}
+
+
 def sanitize_filename(filename: str) -> str:
     """Return a filesystem-safe filename stem from untrusted header data."""
     sanitized = INVALID_FILENAME_CHARS.sub("_", filename).strip()
@@ -56,7 +70,11 @@ def extract_filename(headers: str, content_type: str, output_dir: Path, dry_run:
         The determined filename.
     """
     content_type = content_type.split(";", 1)[0].strip().lower()
-    extension = mimetypes.guess_extension(content_type) or ""
+    extension = (
+        CONTENT_TYPE_EXTENSION_OVERRIDES.get(content_type)
+        or mimetypes.guess_extension(content_type)
+        or ""
+    )
     location = get_header_value(headers, "Content-Location")
 
     if not location:

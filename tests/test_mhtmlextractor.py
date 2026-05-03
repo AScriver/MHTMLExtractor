@@ -38,6 +38,16 @@ class FilenameExtractionTests(unittest.TestCase):
 
         self.assertEqual(filename, hashed_filename(location, "site", ".css"))
 
+    def test_application_javascript_uses_js_extension_when_url_has_no_extension(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            extractor = self.make_extractor(temp_dir)
+            location = "https://example.com/assets/script"
+            headers = f"Content-Location: {location}\r\n"
+
+            filename = extractor._extract_filename(headers, "application/javascript")
+
+        self.assertEqual(filename, hashed_filename(location, "script", ".js"))
+
     def test_mime_extension_is_used_for_root_url_location(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             extractor = self.make_extractor(temp_dir)
