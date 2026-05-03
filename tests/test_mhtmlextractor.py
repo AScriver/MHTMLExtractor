@@ -48,6 +48,17 @@ class FilenameExtractionTests(unittest.TestCase):
 
         self.assertEqual(filename, hashed_filename(location, "site", ".css"))
 
+    def test_folded_content_location_uses_continuation_line(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            extractor = self.make_extractor(temp_dir)
+            location = "https://example.com/assets/site.css"
+            headers = "Content-Location: https://example.com/assets/\r\n site.css\r\n"
+
+            filename = extractor._extract_filename(headers, "text/css")
+
+        self.assertEqual(filename, hashed_filename(location, "site", ".css"))
+
+
     def test_conflict_counter_is_inserted_before_extension(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir)

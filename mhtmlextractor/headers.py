@@ -18,6 +18,7 @@ def get_header_value(headers: str, header_name: str) -> Optional[str]:
     Returns:
         The header value, or None when the header is absent.
     """
+    headers = re.sub(r"\r?\n[ \t]+", "", headers)
     pattern = rf"^{re.escape(header_name)}:\s*([^\r\n]+)"
     match = re.search(pattern, headers, re.IGNORECASE | re.MULTILINE)
     if match:
