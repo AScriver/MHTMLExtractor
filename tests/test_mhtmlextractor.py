@@ -77,6 +77,11 @@ class ContentHandlingTests(unittest.TestCase):
             "plain text",
         )
 
+    def test_quoted_printable_binary_payload_preserves_bytes(self):
+        decoded = MHTMLExtractor._decode_body("quoted-printable", "=FF=D8=FF=E0\r\nbinary")
+
+        self.assertEqual(decoded, b"\xff\xd8\xff\xe0\r\nbinary")
+
 
 class LinkUpdateTests(unittest.TestCase):
     def test_updates_raw_url_with_query_ampersand(self):
@@ -96,6 +101,12 @@ class LinkUpdateTests(unittest.TestCase):
 
 
 class ExtractionTests(unittest.TestCase):
+    def test_extract_requires_mhtml_path(self):
+        extractor = MHTMLExtractor(dry_run=True)
+
+        with self.assertRaisesRegex(ValueError, "mhtml_path is required"):
+            extractor.extract()
+
     def test_binary_transfer_part_preserves_original_bytes(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             work_dir = Path(temp_dir)

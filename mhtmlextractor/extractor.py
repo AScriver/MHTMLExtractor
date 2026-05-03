@@ -406,8 +406,12 @@ class MHTMLExtractor:
 
         Raises:
             FileNotFoundError: If MHTML file does not exist.
+            ValueError: If no MHTML file path was configured.
             PermissionError: If unable to read MHTML file or write output.
         """
+        if self.mhtml_path is None:
+            raise ValueError("mhtml_path is required before extract() can be called")
+
         start_time = time.time()
         temp_buffer_chunks: List[str] = []
 
