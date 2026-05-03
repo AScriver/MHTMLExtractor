@@ -64,9 +64,13 @@ def extract_filename(headers: str, content_type: str, output_dir: Path, dry_run:
 
     try:
         parsed_url = urlparse(location)
-        base_name = os.path.basename(unquote(parsed_url.path)) or parsed_url.netloc
+        path_base_name = os.path.basename(unquote(parsed_url.path))
+        base_name = path_base_name or parsed_url.netloc
         base_name = sanitize_filename(base_name)
-        name_part, ext_part = os.path.splitext(base_name)
+        if path_base_name:
+            name_part, ext_part = os.path.splitext(base_name)
+        else:
+            name_part, ext_part = base_name, ""
         final_extension = ext_part or extension
         filename_stem = name_part or "unnamed"
 
