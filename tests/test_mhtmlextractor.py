@@ -6,7 +6,12 @@ from pathlib import Path
 
 from MHTMLExtractor import DEFAULT_BUFFER_SIZE, MHTMLExtractor, build_arg_parser, configure_logging
 from mhtmlextractor.constants import DEFAULT_BUFFER_SIZE as PACKAGE_DEFAULT_BUFFER_SIZE
-from mhtmlextractor import MHTMLExtractor as PackageMHTMLExtractor
+from mhtmlextractor import (
+    MHTMLArchive,
+    MHTMLExtractor as PackageMHTMLExtractor,
+    MHTMLPart,
+    parse_mhtml,
+)
 
 
 def hashed_filename(location, stem, suffix):
@@ -225,6 +230,91 @@ class ExtractionTests(unittest.TestCase):
             self.assertEqual((output_dir / html_filename).read_text(encoding="utf-8"), html_body)
             self.assertEqual((output_dir / css_filename).read_text(encoding="utf-8"), css_body)
 
+
+class ParseApiTests(unittest.TestCase):
+    def test_parse_mhtml_returns_typed_archive_without_writing_files(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            work_dir = Path(temp_dir)
+            mhtml_path = work_dir / "page.mhtml"
+            boundary = "parse-api-boundary"
+            html_location = "https://example.com/index.html"
+            css_location = "https://example.com/site.css"
+            html_body = "<html><head></head><body>page</body></html>"
+            css_body = "body { color: red; }"
+            mhtml_content = (
+                'Content-Type: multipart/related; boundary="parse-api-boundary"\r\n'
+                "\r\n"
+                f"--{boundary}\r\n"
+                "Content-Type: text/html\r\n"
+                f"Content-Location: {html_location}\r\n"
+                "\r\n"
+                f"{html_body}\r\n"
+                f"--{boundary}\r\n"
+                "Content-Type: text/css\r\n"
+                "Content-ID: <site-css>\r\n"
+                f"Content-Location: {css_location}\r\n"
+                "\r\n"
+                f"{css_body}\r\n"
+                f"--{boundary}--\r\n"
+            )
+            mhtml_path.write_bytes(mhtml_content.encode("latin-1"))
+
+            archive = parse_mhtml(mhtml_path)
+
+            html_filename = hashed_filename(html_location, "index", ".html")
+            css_filename = hashed_filename(css_location, "site", ".css")
+            self.assertIsInstance(archive, MHTMLArchive)
+            self.assertEqual(archive.path, mhtml_path.resolve())
+            self.assertEqual(archive.stats.total_parts, 2)
+            self.assertEqual(archive.url_mapping[html_location], html_filename)
+            self.assertEqual(archive.url_mapping["cid:site-css"], css_filename)
+            self.assertEqual(len(archive.parts), 2)
+            self.assertEqual(
+                archive.parts[0],
+                MHTMLPart(
+                    filename=html_filename,
+                    content_type="text/html",
+                    content=html_body,
+                    content_location=html_location,
+                    content_id=None,
+                ),
+            )
+            self.assertEqual(archive.parts[1].filename, css_filename)
+            self.assertEqual(archive.parts[1].content_type, "text/css")
+            self.assertEqual(archive.parts[1].content, css_body)
+            self.assertEqual(archive.parts[1].content_location, css_location)
+            self.assertEqual(archive.parts[1].content_id, "site-css")
+            self.assertFalse((work_dir / "extracted_mhtml").exists())
+
+    def test_parse_mhtml_honors_html_only_filter(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            work_dir = Path(temp_dir)
+            mhtml_path = work_dir / "page.mhtml"
+            boundary = "parse-api-filter-boundary"
+            html_location = "https://example.com/index.html"
+            css_location = "https://example.com/site.css"
+            mhtml_content = (
+                'Content-Type: multipart/related; boundary="parse-api-filter-boundary"\r\n'
+                "\r\n"
+                f"--{boundary}\r\n"
+                "Content-Type: text/html\r\n"
+                f"Content-Location: {html_location}\r\n"
+                "\r\n"
+                "<html></html>\r\n"
+                f"--{boundary}\r\n"
+                "Content-Type: text/css\r\n"
+                f"Content-Location: {css_location}\r\n"
+                "\r\n"
+                "body { color: red; }\r\n"
+                f"--{boundary}--\r\n"
+            )
+            mhtml_path.write_bytes(mhtml_content.encode("latin-1"))
+
+            archive = parse_mhtml(mhtml_path, html_only=True)
+
+            self.assertEqual(len(archive.parts), 1)
+            self.assertEqual(archive.parts[0].content_type, "text/html")
+            self.assertEqual(archive.stats.skipped_files, 1)
 
 class CliTests(unittest.TestCase):
     def test_legacy_module_exports_package_extractor(self):

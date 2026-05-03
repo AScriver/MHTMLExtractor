@@ -12,3 +12,4 @@ benchmark.py
 
 # Ignore 'NOTES' file in a case-insensitive manner
 [Nn][Oo][Tt][Ee][Ss]
+codex

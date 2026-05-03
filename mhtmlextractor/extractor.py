@@ -294,9 +294,12 @@ class MHTMLExtractor:
                 self.url_mapping[cid] = filename
 
             if self.create_in_memory_output:
+                normalized_content_id = content_id.strip("<>") if content_id else None
                 self.extracted_contents[filename] = {
                     "content_type": content_type,
                     "decoded_body": decoded_body,
+                    "content_location": location,
+                    "content_id": normalized_content_id,
                 }
 
             if not self.dry_run and self.create_output_files:

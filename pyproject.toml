@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "MHTMLExtractor"
+version = "0.1.0"
+description = "Extract files from MHTML documents with a Python API and command-line interface."
+readme = "README.md"
+requires-python = ">=3.7"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Austin Scriver" },
+]
+keywords = [
+    "archive",
+    "extractor",
+    "html",
+    "mhtml",
+    "mime",
+    "web-archive",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: System :: Archiving",
+    "Topic :: Utilities",
+]
+
+[project.scripts]
+mhtml-extract = "mhtmlextractor.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/AScriver/MHTMLExtractor"
+Repository = "https://github.com/AScriver/MHTMLExtractor"
+Issues = "https://github.com/AScriver/MHTMLExtractor/issues"
+
+[tool.setuptools]
+packages = ["mhtmlextractor"]
+py-modules = ["MHTMLExtractor"]
