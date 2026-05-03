@@ -1,173 +1,204 @@
 # MHTMLExtractor
 
-`MHTMLExtractor` is a high-performance, standalone Python utility to extract files from MHTML (MIME HTML) documents. These documents are typically a snapshot of a web page and might contain images, scripts, styles, and the web page itself as a single file.
+MHTMLExtractor extracts resources from MHTML / MIME HTML web archives. It can be
+used as an installable command-line tool or as a Python package for typed,
+in-memory parsing.
 
-## Features
+The project uses only Python's standard library.
 
-- **High Performance**: Optimized memory usage and processing speed with automatic buffer sizing
-- **Dry-run Mode**: Analyze MHTML files without extracting to preview contents
-- **Comprehensive Statistics**: Detailed extraction statistics and timing information
-- **Type Safety**: Full type hints for better code quality and IDE support
-- **Flexible Filtering**: Selectively skip extraction of certain file types (CSS, images, etc.)
-- **Smart Filename Handling**: Intelligent filename generation with conflict resolution
-- **Efficient Processing**: Optimized string operations and memory management
-- **Progress Reporting**: Detailed logging with configurable verbosity levels
+## Requirements
 
-## Performance Improvements
+- Python 3.7 or newer
 
-- **Adaptive Buffer Sizing**: Automatically optimizes buffer size based on file size
-- **Linear String Operations**: Uses list-based concatenation for O(n) performance instead of O(n²)
-- **Efficient Link Updates**: Optimized HTML link replacement using regex substitution
-- **Memory Optimization**: Processes files in chunks to handle large MHTML files efficiently
+## Installation
 
-## Prerequisites
-
-- Python 3.7+ (with type hint support)
-
-## Usage (CLI)
-
-To use the MHTML Extractor, simply run the script and provide the necessary arguments:
+From the repository root:
 
 ```bash
-usage: MHTMLExtractor.py [-h] [--output_dir OUTPUT_DIR] [--buffer_size BUFFER_SIZE] 
-                         [--clear_output_dir] [--no-css] [--no-images] [--html-only] 
-                         [--dry-run] [--verbose] [--quiet]
-                         mhtml_path
-
-positional arguments:
-  mhtml_path              Path to the MHTML document.
-
-optional arguments:
-  -h, --help              show this help message and exit
-  --output_dir OUTPUT_DIR
-                          Output directory for the extracted files. (default: current directory)
-  --buffer_size BUFFER_SIZE
-                          Buffer size for reading the MHTML file. (default: 8192)
-  --clear_output_dir      If set, clears the output directory before extraction.
-  --no-css                If set, CSS files will not be extracted.
-  --no-images             If set, image files will not be extracted.
-  --html-only             If set, only HTML files will be extracted.
-  --dry-run               If set, analyze the MHTML file without extracting files.
-  --verbose, -v           Enable verbose logging output.
-  --quiet, -q             Suppress all output except errors.
+python -m pip install .
 ```
 
-## Usage (Python)
+For local development:
 
-To use the MHTML Extractor, simply import the script and provide the necessary arguments:
-```py
-from MHTMLExtractor import MHTMLExtractor
-
-extractor = MHTMLExtractor(
-  mhtml_path='example.mhtml',
-  output_dir='path/to/output/dir',  # Optional, default is current directory (".")
-  create_in_memory_output=True,  # Optional, default is False. If True, `extractor.extracted_contents` will be created, what contains extracted data. Only available in Python API (not CLI).
-  create_output_files=False  # Optional, default is True. If False, output files won't be created.
-)
+```bash
+python -m pip install -e .
 ```
 
+After installation, the `mhtml-extract` command is available on your PATH.
 
-## Examples (CLI)
+## Command Line
 
-1. **Extract all files** from an MHTML document:
+Extract an archive into the current directory:
+
+```bash
+mhtml-extract example.mhtml
+```
+
+Choose an output directory:
+
+```bash
+mhtml-extract example.mhtml --output_dir ./extracted
+```
+
+Preview what the archive contains without writing files:
+
+```bash
+mhtml-extract example.mhtml --dry-run --verbose
+```
+
+Extract only HTML parts:
+
+```bash
+mhtml-extract example.mhtml --html-only
+```
+
+Skip CSS and image parts:
+
+```bash
+mhtml-extract example.mhtml --no-css --no-images
+```
+
+Common options:
+
+```text
+--output_dir PATH       Directory for extracted files. CLI default: current directory.
+--buffer_size BYTES     Read buffer size. Default: 8192.
+--clear_output_dir      Clear the output directory before extraction.
+--no-css                Skip CSS files.
+--no-images             Skip image files.
+--html-only             Extract only HTML files.
+--dry-run               Analyze the archive without writing files.
+--verbose, -v           Enable verbose logging.
+--quiet, -q             Suppress all output except errors.
+```
+
+The legacy script entry point is still available:
+
 ```bash
 python MHTMLExtractor.py example.mhtml
 ```
 
-2. **Extract files to a specific directory**:
-```bash
-python MHTMLExtractor.py example.mhtml --output_dir ./extracted
+## Python API
+
+Use `parse_mhtml()` when you want a typed in-memory result and do not want files
+written to disk.
+
+```python
+from mhtmlextractor import parse_mhtml
+
+archive = parse_mhtml("example.mhtml")
+
+print(archive.path)
+print(archive.stats.total_parts)
+
+for part in archive.parts:
+    print(part.filename, part.content_type)
+    print(part.content_location)
+    print(part.content_id)
+    print(part.content)
 ```
 
-3. **Extract only HTML files**:
-```bash
-python MHTMLExtractor.py example.mhtml --html-only
+`parse_mhtml()` returns an `MHTMLArchive`:
+
+- `path`: resolved `Path` to the input archive
+- `parts`: tuple of `MHTMLPart` values in archive order
+- `stats`: `ExtractionStats` produced by the extractor
+- `url_mapping`: mapping of source URLs / content IDs to generated filenames
+
+Each `MHTMLPart` contains:
+
+- `filename`
+- `content_type`
+- `content`
+- `content_location`
+- `content_id`
+
+The parser accepts the same content filters as the extractor:
+
+```python
+from mhtmlextractor import parse_mhtml
+
+archive = parse_mhtml(
+    "example.mhtml",
+    html_only=True,
+)
 ```
 
-4. **Dry-run analysis** (preview without extracting):
-```bash
-python MHTMLExtractor.py example.mhtml --dry-run --verbose
+The legacy top-level import remains available for compatibility:
+
+```python
+from MHTMLExtractor import parse_mhtml
 ```
 
-5. **Extract without CSS and images**:
-```bash
-python MHTMLExtractor.py example.mhtml --no-css --no-images
-```
+## File Extraction From Python
 
-6. **High-performance extraction with custom buffer**:
-```bash
-python MHTMLExtractor.py large_file.mhtml --buffer_size 65536 --verbose
-```
+Use `MHTMLExtractor` directly when you want to write extracted files or need
+lower-level control over extraction.
 
-## Examples (Python):
-
-1. In-memory mode (files won't be created):
-```py
-from MHTMLExtractor import MHTMLExtractor
+```python
+from mhtmlextractor import MHTMLExtractor
 
 extractor = MHTMLExtractor(
-  mhtml_path='example.mhtml',
-  create_in_memory_output=True,
-  create_output_files=False
+    mhtml_path="example.mhtml",
+    output_dir="./extracted",
+    clear_output_dir=True,
+)
+
+stats = extractor.extract(no_css=False, no_images=False, html_only=False)
+print(stats.total_parts)
+```
+
+For in-memory access through the lower-level extractor:
+
+```python
+from mhtmlextractor import MHTMLExtractor
+
+extractor = MHTMLExtractor(
+    mhtml_path="example.mhtml",
+    create_in_memory_output=True,
+    create_output_files=False,
 )
 extractor.extract()
 
-# Extracted content available in `extractor.extracted_contents` dict.
 for filename, details in extractor.extracted_contents.items():
-  print('=== Filename:', filename, '\n')
-  print('=== Content type:', details['content_type'], '\n')
-  print('=== Decoded content:', details['decoded_body'])
-
-  break
+    print(filename)
+    print(details["content_type"])
+    print(details["decoded_body"])
 ```
 
-2. Both, in-memory mode and file mode:
-```py
-from MHTMLExtractor import MHTMLExtractor
+For new in-memory code, prefer `parse_mhtml()` because it returns typed result
+objects.
 
-extractor = MHTMLExtractor(
-  mhtml_path='example.mhtml',
-  output_dir='/path/to/output/dir',  # Optional, default is current directory (".")
-  create_in_memory_output=True,
-  create_output_files=True,
-)
-extractor.extract()
+## Behavior Notes
 
-# Extracted content available in `extractor.extracted_contents` dict.
-for filename, details in extractor.extracted_contents.items():
-  print('=== Filename:', filename, '\n')
-  print('=== Content type:', details['content_type'], '\n')
-  print('=== Decoded content:', details['decoded_body'])
+- Filenames are derived from `Content-Location` when available, sanitized for
+  filesystem use, and made unique with a URL-derived hash.
+- `Content-ID` values are normalized and included in `MHTMLPart.content_id`.
+- Extracted HTML links are updated to point at generated local filenames unless
+  `--html-only` is used.
+- `--dry-run` analyzes archives without writing output files.
+- `--no-css`, `--no-images`, and `--html-only` filter extracted or parsed parts.
 
-  break
+## Development
+
+Run the test suite:
+
+```bash
+python -m unittest discover -s tests
 ```
 
-## Notes
+Run a package syntax check:
 
-- **Purpose**: This script is designed to extract files (like images, CSS, and HTML content) from MHTML documents. MHTML is a web page archive format that's used to combine multiple resources from a web page into a single file.
+```bash
+python -m compileall -q MHTMLExtractor.py mhtmlextractor
+```
 
-- **In-Memory Feature**: The `create_in_memory_output` feature is only available when using the Python API directly. It is not accessible via the command-line interface.
+Check the installed command surface from a local editable install:
 
-- **Performance**: The script efficiently reads the MHTML file in adaptive chunks (auto-optimized from 1KB to 1MB) to handle even very large files without consuming excessive memory.
-
-- **Dry-Run Analysis**: Use `--dry-run` to preview what would be extracted without actually writing files. Perfect for analyzing unknown MHTML files.
-
-- **Statistics**: Comprehensive extraction statistics including file counts by type, total size, and processing time.
-
-- **Error Handling**: Robust error handling with specific error types and detailed messages for troubleshooting.
-
-- **Handling Conflicts**: If potential filename conflicts arise (two extracted resources having the same name), the script handles it by appending a counter to the filename.
-
-- **File Naming**: The filenames for the extracted files are based on the `Content-Location` from the MHTML headers with sanitization for filesystem safety. If unavailable, UUID-based filenames are generated. A hash derived from the original URL is appended to ensure uniqueness.
-
-- **Link Updates**: Once extraction is complete, the script updates the links within the extracted HTML files to ensure they point to the new filenames of the extracted resources (unless using `--html-only`).
-
-- **Filtering Options**: The script provides command-line flags to optionally exclude CSS files, image files, or to extract only HTML files.
-
-- **Dependencies**: The script uses only Python's built-in libraries, so no additional installation is required. Requires Python 3.7+ for type hint support.
-
-- **Cross-Platform**: Works on Windows, macOS, and Linux with proper path handling.
+```bash
+mhtml-extract --help
+```
 
 ## License
 
-This script is provided as-is under the MIT License. Use it at your own risk.
+MHTMLExtractor is released under the MIT License. See `LICENSE`.
