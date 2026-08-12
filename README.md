@@ -1,3 +1,5 @@
+
+
 # MHTMLExtractor
 
 MHTMLExtractor extracts resources from MHTML / MIME HTML web archives. It can be
@@ -109,7 +111,7 @@ Each `MHTMLPart` contains:
 
 - `filename`
 - `content_type`
-- `content`
+- `content` (str or bytes)
 - `content_location`
 - `content_id`
 
