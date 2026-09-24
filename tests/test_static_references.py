@@ -53,7 +53,8 @@ class StaticReferenceTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="mhtml-static-refs-")
         self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
+        # Match the extractor's canonical paths when TEMP contains an alias.
+        self.root = Path(temporary.name).resolve()
         self.case_number = 0
 
     def archive(self, parts, outer_location=None):

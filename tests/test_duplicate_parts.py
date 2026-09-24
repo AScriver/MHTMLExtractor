@@ -36,7 +36,8 @@ class DuplicatePartTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="mhtml-duplicates-")
         self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
+        # Match the extractor's canonical paths when TEMP contains an alias.
+        self.root = Path(temporary.name).resolve()
 
     def archive(self, parts, name="input"):
         payload = [b'Content-Type: multipart/related; boundary="duplicates"\r\n\r\n']

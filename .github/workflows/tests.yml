@@ -27,7 +27,19 @@ jobs:
           python-version: ${{ matrix.python-version }}
           architecture: x64
       - name: Record interpreter
-        run: python -c "import platform, struct, sys; print(sys.version); print(platform.platform()); print('Architecture bits:', struct.calcsize('P') * 8)"
+        shell: python
+        run: |
+          import platform
+          import struct
+          import sys
+          import tempfile
+          from pathlib import Path
+
+          print(sys.version)
+          print(platform.platform())
+          print('Architecture bits:', struct.calcsize('P') * 8)
+          print('Temporary directory:', tempfile.gettempdir())
+          print('Resolved temporary directory:', Path(tempfile.gettempdir()).resolve())
       - name: Run source tests
         run: python -m unittest discover -s tests -v
       - name: Check source syntax
