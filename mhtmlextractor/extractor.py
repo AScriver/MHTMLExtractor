@@ -82,6 +82,7 @@ class MHTMLExtractor:
         self.extracted_count: int = 0
         self.url_mapping: Dict[str, str] = {}
         self.saved_html_files: List[str] = []
+        self._reserved_filenames: Set[str] = set()
         self._written_filenames: Set[str] = set()
         self.stats = ExtractionStats()
         self.dry_run = dry_run
@@ -255,12 +256,16 @@ class MHTMLExtractor:
         return decode_content_body(encoding, body)
 
     def _deduplicate_filename(self, filename: str) -> str:
-        """Append a numeric suffix when an output filename already exists."""
-        return deduplicate_output_filename(filename, self.output_dir, self.dry_run)
+        """Append a numeric suffix when a filename is reserved or already exists."""
+        return deduplicate_output_filename(
+            filename, self.output_dir, self.dry_run, self._reserved_filenames
+        )
 
     def _extract_filename(self, headers: str, content_type: str) -> str:
         """Determine the filename based on headers or generate one if necessary."""
-        return extract_part_filename(headers, content_type, self.output_dir, self.dry_run)
+        return extract_part_filename(
+            headers, content_type, self.output_dir, self.dry_run, self._reserved_filenames
+        )
 
     def _process_part(self, part: str, no_css: bool = False, no_images: bool = False, html_only: bool = False) -> None:
         """
@@ -302,6 +307,7 @@ class MHTMLExtractor:
             self._update_stats(content_type, decoded_body)
 
             filename = self._extract_filename(headers, content_type)
+            self._reserved_filenames.add(filename)
 
             part_mapping: Dict[str, str] = {}
             location = self._get_header_value(headers, "Content-Location")

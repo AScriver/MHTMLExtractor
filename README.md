@@ -130,6 +130,19 @@ Each `MHTMLPart` contains:
 - `content_location`
 - `content_id`
 
+Every selected part receives its own filename, even when multiple parts share
+a `Content-Location` or `Content-ID`. Collisions receive numeric suffixes before
+the extension (`name.html`, `name_1.html`, and so on), preserving every body in
+archive order. With no existing output conflicts, parsing, dry-run, memory-only,
+and disk extraction allocate the same names from the same candidates. Resources
+without a location still use random UUID names, so their names can differ between
+runs. Dry-run ignores existing output files but reserves names within the archive.
+
+`url_mapping` selects one target per source URL or `cid:` identifier. Duplicate
+identifiers use the last selected part; all earlier parts remain in `parts` or
+`extracted_contents` under their own filenames. Filtered parts do not reserve
+names or change mappings.
+
 The parser accepts the same content filters as the extractor:
 
 ```python
@@ -181,6 +194,12 @@ successful. Setup and input errors still raise exceptions.
 An HTML file can have a successful initial write and a failed rewrite. Its
 original bytes remain available, but the overall extraction has failed. Disk
 links are updated only for resources successfully written to disk.
+
+For disk-only extraction, duplicate identifier mappings select the last
+successfully written part. With combined memory and file output, mappings select
+the last part retained in memory, even if its disk write failed; HTML rewriting
+excludes such failed targets. A failed write does not release its reserved name,
+so later parts cannot replace its retained in-memory body.
 
 For in-memory access through the lower-level extractor:
 
