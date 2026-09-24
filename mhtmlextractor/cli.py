@@ -34,7 +34,7 @@ Examples:
         default=DEFAULT_BUFFER_SIZE,
         help=f"Buffer size for reading the MHTML file. (default: {DEFAULT_BUFFER_SIZE})",
     )
-    parser.add_argument("--clear_output_dir", action="store_true", help="If set, clears the output directory before extraction.")
+    parser.add_argument("--clear_output_dir", action="store_true", help="Recursively clear output contents before extraction; input must be outside output.")
     parser.add_argument("--no-css", action="store_true", help="If set, CSS files will not be extracted.")
     parser.add_argument("--no-images", action="store_true", help="If set, image files will not be extracted.")
     parser.add_argument("--html-only", action="store_true", help="If set, only HTML files will be extracted.")
@@ -82,7 +82,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         stats = extractor.extract(args.no_css, args.no_images, args.html_only)
 
         if stats.total_parts == 0:
-            logging.warning("No parts were found in the MHTML file")
+            logging.warning("No selected parts were decoded from the MHTML file")
+            return 1
+        if stats.failed_files or stats.rewrite_failures:
+            logging.error(
+                f"Extraction had {stats.failed_files} failed files and "
+                f"{stats.rewrite_failures} HTML rewrite failures "
+                f"({stats.written_files} files written)"
+            )
             return 1
         return 0
 

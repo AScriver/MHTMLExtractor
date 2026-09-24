@@ -15,3 +15,7 @@ class ExtractionStats:
     skipped_files: int = 0
     total_size: int = 0
     extraction_time: float = 0.0
+    written_files: int = 0
+    filtered_files: int = 0
+    failed_files: int = 0
+    rewrite_failures: int = 0

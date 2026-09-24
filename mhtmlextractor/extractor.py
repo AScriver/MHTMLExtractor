@@ -3,9 +3,10 @@
 import logging
 import re
 import shutil
+import tempfile
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Set, Union
 
 from .constants import DEFAULT_BUFFER_SIZE, MAX_BUFFER_SIZE, MIN_BUFFER_SIZE
 from .decoding import decode_body as decode_content_body
@@ -81,6 +82,7 @@ class MHTMLExtractor:
         self.extracted_count: int = 0
         self.url_mapping: Dict[str, str] = {}
         self.saved_html_files: List[str] = []
+        self._written_filenames: Set[str] = set()
         self.stats = ExtractionStats()
         self.dry_run = dry_run
         self.create_in_memory_output = create_in_memory_output
@@ -132,6 +134,13 @@ class MHTMLExtractor:
         Raises:
             PermissionError: If unable to create or access the directory.
         """
+        if clear and self.mhtml_path is not None and (
+            self.mhtml_path == self.output_dir or self.output_dir in self.mhtml_path.parents
+        ):
+            raise ValueError(
+                f"Cannot clear output directory containing the MHTML input: {self.output_dir}"
+            )
+
         try:
             if not self.output_dir.exists():
                 self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -140,12 +149,19 @@ class MHTMLExtractor:
                 self._clear_directory(self.output_dir)
                 logging.info(f"Cleared output directory: {self.output_dir}")
 
-            test_file = self.output_dir / ".mhtml_extractor_test"
+            probe_stage = "create"
             try:
-                test_file.touch()
-                test_file.unlink()
+                with tempfile.NamedTemporaryFile(
+                    prefix=".mhtml_extractor_test_", dir=str(self.output_dir)
+                ) as probe_file:
+                    probe_stage = "write"
+                    probe_file.write(b"x")
+                    probe_file.flush()
+                    probe_stage = "remove"
             except OSError as e:
-                raise PermissionError(f"No write permission in output directory: {self.output_dir}") from e
+                raise PermissionError(
+                    f"Could not {probe_stage} temporary writability probe in {self.output_dir}: {e}"
+                ) from e
 
         except OSError as e:
             raise PermissionError(f"Error setting up output directory: {e}") from e
@@ -256,6 +272,8 @@ class MHTMLExtractor:
             no_images: If True, image files will not be extracted.
             html_only: If True, only HTML files will be extracted.
         """
+        filename = "<unnamed>"
+        stage = "processing"
         try:
             if "\r\n\r\n" in part:
                 headers, body = part.split("\r\n\r\n", 1)
@@ -273,6 +291,7 @@ class MHTMLExtractor:
 
             if self._should_skip_content(content_type, no_css, no_images, html_only):
                 self.stats.skipped_files += 1
+                self.stats.filtered_files += 1
                 return
 
             encoding = self._get_header_value(headers, "Content-Transfer-Encoding")
@@ -284,14 +303,15 @@ class MHTMLExtractor:
 
             filename = self._extract_filename(headers, content_type)
 
+            part_mapping: Dict[str, str] = {}
             location = self._get_header_value(headers, "Content-Location")
             if location:
-                self.url_mapping[location] = filename
+                part_mapping[location] = filename
 
             content_id = self._get_header_value(headers, "Content-ID")
             if content_id:
                 cid = "cid:" + content_id.strip("<>")
-                self.url_mapping[cid] = filename
+                part_mapping[cid] = filename
 
             if self.create_in_memory_output:
                 normalized_content_id = content_id.strip("<>") if content_id else None
@@ -302,14 +322,23 @@ class MHTMLExtractor:
                     "content_id": normalized_content_id,
                 }
 
+            if self.create_in_memory_output or self.dry_run or not self.create_output_files:
+                self.url_mapping.update(part_mapping)
+
             if not self.dry_run and self.create_output_files:
+                stage = "writing"
                 self._write_to_file(filename, content_type, decoded_body)
+                self.url_mapping.update(part_mapping)
+                self.stats.written_files += 1
+                self._written_filenames.add(filename)
+                if "html" in content_type:
+                    self.saved_html_files.append(filename)
             elif self.dry_run:
                 logging.info(f"[DRY RUN] Would extract: {filename} ({content_type})")
 
         except Exception as e:
-            logging.error(f"Error processing MHTML part: {e}")
-            self.stats.skipped_files += 1
+            logging.error(f"Failed {stage} MHTML part {filename}: {e}")
+            self.stats.failed_files += 1
 
     def _should_skip_content(self, content_type: str, no_css: bool, no_images: bool, html_only: bool) -> bool:
         """
@@ -369,22 +398,24 @@ class MHTMLExtractor:
         Raises:
             OSError: If file cannot be written.
         """
+        if isinstance(decoded_body, str):
+            decoded_body = decoded_body.encode("utf-8")
+
+        file_path = self.output_dir / filename
+        created = False
         try:
-            if isinstance(decoded_body, str):
-                decoded_body = decoded_body.encode("utf-8")
-
-            if "html" in content_type:
-                self.saved_html_files.append(filename)
-
-            file_path = self.output_dir / filename
-            with file_path.open("wb") as out_file:
+            with file_path.open("xb") as out_file:
+                created = True
                 out_file.write(decoded_body)
-
-            logging.debug(f"Wrote {len(decoded_body)} bytes to {filename}")
-
-        except OSError as e:
-            logging.error(f"Error writing file {filename}: {e}")
+        except Exception:
+            if created:
+                try:
+                    file_path.unlink()
+                except OSError as cleanup_error:
+                    logging.error(f"Could not remove incomplete output {file_path}: {cleanup_error}")
             raise
+
+        logging.debug(f"Wrote {len(decoded_body)} bytes to {filename}")
 
     def _update_html_links(
         self,
@@ -488,10 +519,14 @@ class MHTMLExtractor:
             no_images: Skip image link updates.
             html_only: Skip all link updates.
         """
-        update_extracted_html_links(
+        disk_mapping = {
+            url: filename for url, filename in self.url_mapping.items()
+            if filename in self._written_filenames
+        }
+        self.stats.rewrite_failures += update_extracted_html_links(
             self.output_dir,
             self.saved_html_files,
-            self.url_mapping,
+            disk_mapping,
             no_css,
             no_images,
             html_only,
@@ -499,10 +534,11 @@ class MHTMLExtractor:
 
     def _log_extraction_summary(self) -> None:
         """Log a summary of the extraction process."""
+        has_failures = bool(self.stats.failed_files or self.stats.rewrite_failures)
         if self.dry_run:
-            logging.info("[DRY RUN] Analysis complete:")
+            logging.info("[DRY RUN] Analysis finished with failures:" if has_failures else "[DRY RUN] Analysis complete:")
         else:
-            logging.info("Extraction complete:")
+            logging.info("Extraction finished with failures:" if has_failures else "Extraction complete:")
 
         logging.info(f"  Total parts processed: {self.stats.total_parts}")
         logging.info(f"  HTML files: {self.stats.html_files}")
@@ -510,13 +546,15 @@ class MHTMLExtractor:
         logging.info(f"  Image files: {self.stats.image_files}")
         logging.info(f"  Other files: {self.stats.other_files}")
         logging.info(f"  Skipped files: {self.stats.skipped_files}")
+        logging.info(f"  Filtered files: {self.stats.filtered_files}")
+        logging.info(f"  Failed files: {self.stats.failed_files}")
+        logging.info(f"  HTML rewrite failures: {self.stats.rewrite_failures}")
         logging.info(f"  Total size: {self.stats.total_size:,} bytes")
         logging.info(f"  Extraction time: {self.stats.extraction_time:.2f} seconds")
 
         if not self.dry_run:
             if self.create_output_files:
-                near = " (relative to script file)" if str(self.output_dir).startswith("./") else ""
-                logging.info(f"Extracted {self.extracted_count - 1} files into {self.output_dir}{near}.")
+                logging.info(f"Extracted {self.stats.written_files} files into {self.output_dir}.")
 
             if self.create_in_memory_output:
-                logging.info(f"Extracted {self.extracted_count - 1} files content into `extracted_contents` property.")
+                logging.info(f"Extracted {len(self.extracted_contents)} files content into `extracted_contents` property.")

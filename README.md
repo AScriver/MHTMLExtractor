@@ -63,7 +63,7 @@ Common options:
 ```text
 --output_dir PATH       Directory for extracted files. CLI default: current directory.
 --buffer_size BYTES     Read buffer size. Default: 8192.
---clear_output_dir      Clear the output directory before extraction.
+--clear_output_dir      Recursively clear output before extraction (input must be outside it).
 --no-css                Skip CSS files.
 --no-images             Skip image files.
 --html-only             Extract only HTML files.
@@ -77,6 +77,23 @@ The legacy script entry point is still available:
 ```bash
 python MHTMLExtractor.py example.mhtml
 ```
+
+Existing output files are preserved during ordinary extraction; colliding names
+receive a numeric suffix. If another file appears at the selected name before
+the write, extraction reports a failure instead of overwriting it.
+
+`--clear_output_dir` explicitly removes the output directory's contents,
+including subdirectories. The resolved input archive must be outside that
+directory; otherwise extraction rejects the request before deleting anything.
+`--dry-run` does not create, clear, probe, or write output, even when combined
+with `--clear_output_dir`.
+
+The CLI exits nonzero for a failed part write or HTML link rewrite, including
+partial success. Successfully written files are retained. HTML rewrites replace
+the original only after the complete replacement has been written and closed;
+a failed rewrite preserves the original extracted HTML. Write errors remain
+visible with `--quiet`. A run with no selected, decoded parts also exits nonzero,
+including when every part was filtered out.
 
 ## Python API
 
@@ -141,12 +158,29 @@ from mhtmlextractor import MHTMLExtractor
 extractor = MHTMLExtractor(
     mhtml_path="example.mhtml",
     output_dir="./extracted",
-    clear_output_dir=True,
 )
 
 stats = extractor.extract(no_css=False, no_images=False, html_only=False)
-print(stats.total_parts)
+print(stats.written_files)
+print(stats.failed_files, stats.rewrite_failures)
 ```
+
+`extract()` returns statistics for both successful and failed parts; callers
+should check `failed_files` and `rewrite_failures` before treating a run as
+successful. Setup and input errors still raise exceptions.
+
+| Statistic | Meaning |
+| --- | --- |
+| `total_parts`, type counts, `total_size` | Selected, decoded content, including a part whose later file write failed. These remain available during parsing and dry-run. |
+| `written_files` | Initial output files successfully written and closed; zero in no-write modes. |
+| `filtered_files` | Parts excluded by content filters. |
+| `skipped_files` | Filtered or otherwise skipped input, excluding processing/write failures. |
+| `failed_files` | Selected parts that failed processing or initial writing. |
+| `rewrite_failures` | Failed HTML postprocessing operations, separate from initial file writes. |
+
+An HTML file can have a successful initial write and a failed rewrite. Its
+original bytes remain available, but the overall extraction has failed. Disk
+links are updated only for resources successfully written to disk.
 
 For in-memory access through the lower-level extractor:
 
