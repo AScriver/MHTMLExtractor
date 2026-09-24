@@ -17,8 +17,8 @@ from mhtmlextractor.cli import main
 
 HTML_URL = "https://example.test/index.html"
 CSS_URL = "https://example.test/site.css"
-HTML_BODY = '<html><link rel="stylesheet" href="' + CSS_URL + '"></html>'
-CSS_BODY = "body{color:red}"
+HTML_BODY = '<html><meta charset="utf-8"><link rel="stylesheet" href="' + CSS_URL + '"></html>'
+CSS_BODY = '@charset "utf-8";body{color:red}'
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 

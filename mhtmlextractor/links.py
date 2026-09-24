@@ -32,7 +32,7 @@ def update_html_links(
     if html_only:
         return
 
-    with filepath.open("r", encoding="utf-8", errors="replace") as html_file:
+    with filepath.open("r", encoding="utf-8") as html_file:
         content = html_file.read()
 
     original_content = content

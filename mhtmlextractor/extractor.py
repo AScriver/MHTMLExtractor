@@ -15,11 +15,13 @@ from .filenames import deduplicate_filename as deduplicate_output_filename
 from .filenames import extract_filename as extract_part_filename
 from .filenames import sanitize_filename as sanitize_output_filename
 from .headers import get_content_type as parse_content_type
+from .headers import get_content_charset as parse_content_charset
 from .headers import get_header_value as parse_header_value
 from .headers import read_boundary as parse_boundary
 from .links import update_all_html_links as update_extracted_html_links
 from .links import update_html_links as update_single_html_links
 from .stats import ExtractionStats
+from .text_encoding import TextNormalizationError, normalize_text
 
 
 class MHTMLExtractor:
@@ -84,6 +86,9 @@ class MHTMLExtractor:
         self.saved_html_files: List[str] = []
         self._reserved_filenames: Set[str] = set()
         self._written_filenames: Set[str] = set()
+        # Written bytes are not necessarily safe to decode and rewrite. Keep
+        # this decision separate from both disk mappings and original content.
+        self._text_rewrite_eligibility: Dict[str, bool] = {}
         self.stats = ExtractionStats()
         self.dry_run = dry_run
         self.create_in_memory_output = create_in_memory_output
@@ -332,12 +337,26 @@ class MHTMLExtractor:
                 self.url_mapping.update(part_mapping)
 
             if not self.dry_run and self.create_output_files:
+                disk_body = decoded_body.encode("latin-1") if isinstance(decoded_body, str) else decoded_body
+                rewrite_eligible = False
+                normalization_error = None
+                if content_type in {"text/html", "text/css"}:
+                    try:
+                        disk_body = normalize_text(disk_body, content_type, parse_content_charset(headers))
+                        rewrite_eligible = True
+                    except TextNormalizationError as error:
+                        normalization_error = error
+                        logging.error(f"Failed normalizing MHTML part {filename}; preserving original bytes: {error}")
+
                 stage = "writing"
-                self._write_to_file(filename, content_type, decoded_body)
+                self._write_to_file(filename, content_type, disk_body)
                 self.url_mapping.update(part_mapping)
                 self.stats.written_files += 1
                 self._written_filenames.add(filename)
-                if "html" in content_type:
+                self._text_rewrite_eligibility[filename] = rewrite_eligible
+                if normalization_error is not None:
+                    self.stats.failed_files += 1
+                if content_type == "text/html":
                     self.saved_html_files.append(filename)
             elif self.dry_run:
                 logging.info(f"[DRY RUN] Would extract: {filename} ({content_type})")
@@ -405,7 +424,7 @@ class MHTMLExtractor:
             OSError: If file cannot be written.
         """
         if isinstance(decoded_body, str):
-            decoded_body = decoded_body.encode("utf-8")
+            decoded_body = decoded_body.encode("latin-1")
 
         file_path = self.output_dir / filename
         created = False
@@ -432,6 +451,9 @@ class MHTMLExtractor:
         html_only: bool = False,
     ) -> None:
         """Update links in one extracted HTML file."""
+        if (filepath.resolve().parent == self.output_dir
+                and self._text_rewrite_eligibility.get(filepath.name) is False):
+            return
         update_single_html_links(
             filepath,
             sorted_urls,
@@ -531,7 +553,8 @@ class MHTMLExtractor:
         }
         self.stats.rewrite_failures += update_extracted_html_links(
             self.output_dir,
-            self.saved_html_files,
+            [filename for filename in self.saved_html_files
+             if self._text_rewrite_eligibility.get(filename, False)],
             disk_mapping,
             no_css,
             no_images,

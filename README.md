@@ -88,12 +88,51 @@ directory; otherwise extraction rejects the request before deleting anything.
 `--dry-run` does not create, clear, probe, or write output, even when combined
 with `--clear_output_dir`.
 
-The CLI exits nonzero for a failed part write or HTML link rewrite, including
+The CLI exits nonzero for failed text normalization, a part write, or an HTML link rewrite, including
 partial success. Successfully written files are retained. HTML rewrites replace
 the original only after the complete replacement has been written and closed;
 a failed rewrite preserves the original extracted HTML. Write errors remain
 visible with `--quiet`. A run with no selected, decoded parts also exits nonzero,
 including when every part was filtered out.
+
+### Text encodings on disk
+
+Extracted `text/html` and `text/css` files are normalized to UTF-8. HTML encoding
+declarations (`meta charset` and `http-equiv="Content-Type"`) are updated, with
+an early UTF-8 declaration added when necessary. CSS receives a leading
+`@charset "utf-8";` declaration. This also applies with `--html-only`; it does
+not depend on the link-rewriting pass.
+
+Encoding selection uses a UTF-8 or UTF-16 BOM first, then the MIME `charset`
+parameter, then an actual HTML encoding declaration or the exact leading CSS
+`@charset "...";` form. Undeclared text must be valid UTF-8. A present but empty
+or unsupported selected label fails instead of falling through to another
+encoding. A BOM overrides lower-priority declarations.
+
+Supported labels follow the [WHATWG Encoding Standard](https://encoding.spec.whatwg.org/#names-and-labels),
+with ASCII case and surrounding ASCII whitespace ignored:
+
+- UTF-8: `unicode-1-1-utf-8`, `unicode11utf8`, `unicode20utf8`, `utf-8`, `utf8`,
+  `x-unicode20utf8`.
+- Windows-1252: `ansi_x3.4-1968`, `ascii`, `cp1252`, `cp819`, `csisolatin1`,
+  `ibm819`, `iso-8859-1`, `iso-ir-100`, `iso8859-1`, `iso88591`, `iso_8859-1`,
+  `iso_8859-1:1987`, `l1`, `latin1`, `us-ascii`, `windows-1252`, `x-cp1252`.
+- UTF-16LE and UTF-16BE are supported only with a BOM. Label-only UTF-16 and
+  other Python codec names are unsupported.
+
+This is a bounded policy: it does not guess an encoding or implement CSS
+encoding inheritance from a referring page. An unsupported label, invalid
+selected byte sequence, or unsafe declaration normalization preserves the
+original transfer-decoded bytes on disk and reports a failed part. That file
+is excluded from subsequent text rewriting, even if its bytes happen to be
+valid UTF-8. Other MIME types, including XML, XHTML, JavaScript, plain text,
+and binary resources, retain their original octets.
+
+These transformations affect disk output only. `parse_mhtml()` and
+`extracted_contents` retain the original transfer-decoded `str` or `bytes`.
+In particular, a transport `str` is the original Latin-1 byte representation,
+not a promise that its characters have been decoded using the declared charset.
+Parsing, dry-run, and memory-only extraction do not normalize or write text.
 
 ## Python API
 
@@ -188,12 +227,15 @@ successful. Setup and input errors still raise exceptions.
 | `written_files` | Initial output files successfully written and closed; zero in no-write modes. |
 | `filtered_files` | Parts excluded by content filters. |
 | `skipped_files` | Filtered or otherwise skipped input, excluding processing/write failures. |
-| `failed_files` | Selected parts that failed processing or initial writing. |
+| `failed_files` | Selected parts that failed processing, text normalization, or initial writing; counted once per failed part. |
 | `rewrite_failures` | Failed HTML postprocessing operations, separate from initial file writes. |
 
 An HTML file can have a successful initial write and a failed rewrite. Its
 original bytes remain available, but the overall extraction has failed. Disk
 links are updated only for resources successfully written to disk.
+Likewise, preserving a part's original bytes after failed normalization counts
+as both a successful initial write and a failed part. Those preserved files
+are not eligible for text rewriting.
 
 For disk-only extraction, duplicate identifier mappings select the last
 successfully written part. With combined memory and file output, mappings select

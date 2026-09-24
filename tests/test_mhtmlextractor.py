@@ -175,7 +175,7 @@ class ExtractionTests(unittest.TestCase):
             output_dir = work_dir / "out"
             mhtml_path = work_dir / "inline-boundary.mhtml"
             location = "https://example.com/index.html"
-            body = "Before inline --issue9-boundary marker after"
+            body = '<meta charset="utf-8">Before inline --issue9-boundary marker after'
             boundary = "issue9-boundary"
             mhtml_content = (
                 'Content-Type: multipart/related; boundary="issue9-boundary"\r\n'
@@ -203,8 +203,8 @@ class ExtractionTests(unittest.TestCase):
             boundary = "issue9-boundary"
             html_location = "https://example.com/index.html"
             css_location = "https://example.com/site.css"
-            html_body = "<html><head></head><body>page</body></html>"
-            css_body = "body { color: red; }"
+            html_body = '<html><head><meta charset="utf-8"></head><body>page</body></html>'
+            css_body = '@charset "utf-8";body { color: red; }'
             mhtml_content = (
                 'Content-Type: multipart/related; boundary="issue9-boundary"\r\n'
                 "\r\n"

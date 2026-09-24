@@ -2,6 +2,8 @@
 
 import logging
 import re
+from email.message import Message
+from email.utils import collapse_rfc2231_value
 from typing import Optional
 
 from .constants import BOUNDARY_PATTERNS
@@ -32,6 +34,23 @@ def get_content_type(headers: str) -> Optional[str]:
     if content_type:
         return content_type.split(";", 1)[0].strip().lower()
     return None
+
+
+def get_content_charset(headers: str) -> Optional[str]:
+    """Return the MIME charset, preserving an explicitly empty parameter.
+
+    None means no charset parameter was supplied; ``''`` means one was supplied
+    with an empty value. Encoding policy belongs to the text normalizer.
+    """
+    content_type = get_header_value(headers, "Content-Type")
+    if content_type is None:
+        return None
+    message = Message()
+    message["Content-Type"] = content_type
+    charset = message.get_param("charset", header="content-type")
+    if isinstance(charset, tuple):
+        return collapse_rfc2231_value(charset)
+    return charset
 
 
 def read_boundary(temp_buffer: str) -> Optional[str]:

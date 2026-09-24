@@ -16,6 +16,8 @@ BASE = "repeat_" + hashlib.md5(REPEAT.encode()).hexdigest() + ".html"
 SECOND = BASE.replace(".html", "_1.html")
 THIRD = BASE.replace(".html", "_2.html")
 OTHER_NAME = "other_" + hashlib.md5(OTHER.encode()).hexdigest() + ".html"
+HTML_DECLARATION = '<meta charset="utf-8">'
+CSS_DECLARATION = '@charset "utf-8";'
 MODES = (
     ("dry", {"dry_run": True}),
     ("dry_memory", {"dry_run": True, "create_in_memory_output": True}),
@@ -76,6 +78,10 @@ class DuplicatePartTests(unittest.TestCase):
         for part, filename in zip(parts, names):
             body = part[1]
             expected = body if isinstance(body, bytes) else body.encode("utf-8")
+            if part[0] == "text/html":
+                expected = HTML_DECLARATION.encode("ascii") + expected
+            elif part[0] == "text/css":
+                expected = CSS_DECLARATION.encode("ascii") + expected
             self.assertEqual((output / filename).read_bytes(), expected)
 
     def test_duplicate_locations_keep_every_body_in_archive_order_across_modes(self):
@@ -241,7 +247,7 @@ class DuplicatePartTests(unittest.TestCase):
                     path = output / name
                     self.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), before)
                 for part, name in zip(parts, names):
-                    self.assertEqual((output / name).read_text(), part[1])
+                    self.assertEqual((output / name).read_text(), HTML_DECLARATION + part[1])
                 self.assertEqual(len(list(output.iterdir())), 5)
                 self.assert_stats(stats, parts, written=3)
                 if memory:
@@ -351,7 +357,7 @@ class DuplicatePartTests(unittest.TestCase):
                     if not (fail_last and memory):
                         expected_html = page_body.replace(REPEAT, mapping_target).replace("cid:shared", mapping_target)
                     page_name = extractor.url_mapping[page_url]
-                    self.assertEqual((output / page_name).read_text(), expected_html)
+                    self.assertEqual((output / page_name).read_text(), HTML_DECLARATION + expected_html)
                     self.assert_stats(stats, parts, written=2 if fail_last else 3, failed=int(fail_last))
                     if memory:
                         self.assert_memory(extractor.extracted_contents, parts, [page_name, BASE, SECOND])
