@@ -3,6 +3,8 @@
 ## Install
 
 - Use Python 3.7 or newer.
+- Source CI covers x64 CPython 3.7 through 3.14 on Windows and Linux. Keep the minimum at 3.7 and do not add an upper installation cap.
+- Project compatibility testing does not imply upstream maintenance of end-of-life Python versions.
 - From the repository root, install normally with `python -m pip install .`.
 - For local development, install editable with `python -m pip install -e .`.
 - After installation, confirm the command surface with `mhtml-extract --help`.
@@ -39,10 +41,14 @@ Use `MHTMLExtractor` or `mhtml-extract` when you need files written to disk.
 
 ## Test
 
+- `.github/workflows/tests.yml` runs the source suite and syntax check on pushes and pull requests across Windows Server 2022 / Ubuntu 22.04 and CPython 3.7-3.14.
+- Source tests use only the standard library and run without a package installation.
 - Run tests with `python -m unittest discover -s tests`.
+- CI adds `-v` to expose skips: the TOML metadata test skips below 3.11, and symlink coverage may skip when the platform cannot create symlinks.
 - Run a syntax check with `python -m compileall -q MHTMLExtractor.py mhtmlextractor`.
 - Do not use `python -m py_compile mhtmlextractor\*.py` in PowerShell; the wildcard can be passed literally.
 - For installability changes, verify an editable install and run `mhtml-extract --help`.
+- Source and editable-install checks do not replace separate clean wheel/sdist installation validation.
 
 ## Avoid Unsafe Assumptions
 

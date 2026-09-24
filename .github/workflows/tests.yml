@@ -1,0 +1,35 @@
+name: Source compatibility
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022]
+        python-version: ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        id: python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: x64
+      - name: Record interpreter
+        run: python -c "import platform, struct, sys; print(sys.version); print(platform.platform()); print('Architecture bits:', struct.calcsize('P') * 8)"
+      - name: Run source tests
+        run: python -m unittest discover -s tests -v
+      - name: Check source syntax
+        if: ${{ !cancelled() && steps.python.outcome == 'success' }}
+        run: python -m compileall -q MHTMLExtractor.py mhtmlextractor

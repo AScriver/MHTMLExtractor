@@ -10,6 +10,12 @@ The project uses only Python's standard library.
 
 - Python 3.7 or newer
 
+The source compatibility CI matrix covers x64 CPython 3.7 through 3.14 on
+Windows and Linux. The package has no upper Python version cap; versions beyond
+this matrix are not yet verified. Compatibility testing of older Python versions
+does not imply upstream maintenance. See the
+[official Python version status](https://devguide.python.org/versions/).
+
 ## Installation
 
 From the repository root:
@@ -307,11 +313,23 @@ objects.
 
 ## Development
 
-Run the test suite:
+The [source compatibility workflow](.github/workflows/tests.yml) runs on pushes
+and pull requests using Windows Server 2022 and Ubuntu 22.04, with x64 CPython
+3.7 through 3.14. It runs the source tests and syntax check directly from the
+checkout using only the standard library; no package installation is required.
+Each matrix job reports its interpreter version and runs independently so one
+failure does not cancel the other versions.
+
+Run the same test suite locally:
 
 ```bash
 python -m unittest discover -s tests
 ```
+
+CI adds `-v` to show individual tests and skip reasons. The TOML metadata test
+skips on Python 3.7 through 3.10 because `tomllib` is available from Python 3.11;
+the extraction tests still run. A symlink test may skip when the platform cannot
+create symlinks.
 
 Run a package syntax check:
 
@@ -324,6 +342,9 @@ Check the installed command surface from a local editable install:
 ```bash
 mhtml-extract --help
 ```
+
+Source compatibility and editable-install checks do not verify installed wheel
+or source-distribution behavior; those require separate clean installations.
 
 ## License
 
