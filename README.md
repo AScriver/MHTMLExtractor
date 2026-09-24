@@ -88,10 +88,10 @@ directory; otherwise extraction rejects the request before deleting anything.
 `--dry-run` does not create, clear, probe, or write output, even when combined
 with `--clear_output_dir`.
 
-The CLI exits nonzero for failed text normalization, a part write, or an HTML link rewrite, including
-partial success. Successfully written files are retained. HTML rewrites replace
+The CLI exits nonzero for failed text normalization, a part write, or an HTML/CSS reference rewrite, including
+partial success. Successfully written files are retained. Reference rewrites replace
 the original only after the complete replacement has been written and closed;
-a failed rewrite preserves the original extracted HTML. Write errors remain
+a failed rewrite preserves the original extracted file. Write errors remain
 visible with `--quiet`. A run with no selected, decoded parts also exits nonzero,
 including when every part was filtered out.
 
@@ -133,6 +133,37 @@ These transformations affect disk output only. `parse_mhtml()` and
 In particular, a transport `str` is the original Latin-1 byte representation,
 not a promise that its characters have been decoded using the declared charset.
 Parsing, dry-run, and memory-only extraction do not normalize or write text.
+
+### Static resource references
+
+Saved HTML and CSS use portable, URL-escaped filenames for captured resources
+that were successfully written. References are matched as complete URLs,
+including their query; resource fragments are retained. Supported contexts are
+HTML `href`/`src` on URL-bearing elements, `video poster`, `object data`, style
+attributes and blocks, and external CSS `url()` and quoted or `url()` imports.
+HTML character references and CSS escapes are decoded for matching. Paragraphs,
+comments, script text, ordinary CSS strings, and unrelated markup are preserved,
+including the normalized file's original line endings.
+
+Relative references use the original document or stylesheet location, with
+the first HTML `base href` and available outer MIME `Content-Location` supplying
+context. Every HTML base `href` is removed after resolution; `target` is kept.
+Uncaptured, filtered, and failed-write destinations retain their source URL,
+made absolute where necessary. With no absolute source location, a private
+archive root resolves relative identities; unresolved paths are written relative
+to the output directory without inventing a remote address. Document-local
+`#fragment` references stay local. General URL paths are not percent-decoded
+into different identities; percent-escaped `cid:` references match Content-IDs.
+HTTP, HTTPS, file, and FTP locations are supported; other schemes remain intact
+unless a `cid:` reference has a captured target. Extraction never fetches URLs.
+
+This is static reference localization, not a browser or MIME-tree reconstruction.
+Script code and dynamic requests, form actions, `srcset`, `srcdoc`, SVG/XML
+(including foreign subtrees), and nested MIME scopes are not transformed.
+Their relative runtime behavior after base removal is outside this guarantee.
+Malformed reference tokens are left intact. CSS-only archives are processed;
+`--html-only` skips reference rewriting. Files preserved after failed text
+normalization are never rewritten. In-memory parse results remain unchanged.
 
 ## Python API
 
@@ -228,9 +259,9 @@ successful. Setup and input errors still raise exceptions.
 | `filtered_files` | Parts excluded by content filters. |
 | `skipped_files` | Filtered or otherwise skipped input, excluding processing/write failures. |
 | `failed_files` | Selected parts that failed processing, text normalization, or initial writing; counted once per failed part. |
-| `rewrite_failures` | Failed HTML postprocessing operations, separate from initial file writes. |
+| `rewrite_failures` | Failed HTML/CSS reference postprocessing operations, separate from initial file writes. |
 
-An HTML file can have a successful initial write and a failed rewrite. Its
+An HTML or CSS file can have a successful initial write and a failed rewrite. Its
 original bytes remain available, but the overall extraction has failed. Disk
 links are updated only for resources successfully written to disk.
 Likewise, preserving a part's original bytes after failed normalization counts

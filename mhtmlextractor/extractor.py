@@ -20,6 +20,7 @@ from .headers import get_header_value as parse_header_value
 from .headers import read_boundary as parse_boundary
 from .links import update_all_html_links as update_extracted_html_links
 from .links import update_html_links as update_single_html_links
+from .reference_urls import ResourceInfo
 from .stats import ExtractionStats
 from .text_encoding import TextNormalizationError, normalize_text
 
@@ -89,6 +90,8 @@ class MHTMLExtractor:
         # Written bytes are not necessarily safe to decode and rewrite. Keep
         # this decision separate from both disk mappings and original content.
         self._text_rewrite_eligibility: Dict[str, bool] = {}
+        self._resource_info: Dict[str, ResourceInfo] = {}
+        self._archive_location: Optional[str] = None
         self.stats = ExtractionStats()
         self.dry_run = dry_run
         self.create_in_memory_output = create_in_memory_output
@@ -324,6 +327,11 @@ class MHTMLExtractor:
                 cid = "cid:" + content_id.strip("<>")
                 part_mapping[cid] = filename
 
+            self._resource_info[filename] = ResourceInfo(
+                content_type, location, content_id.strip("<>") if content_id else None,
+                self.stats.total_parts,
+            )
+
             if self.create_in_memory_output:
                 normalized_content_id = content_id.strip("<>") if content_id else None
                 self.extracted_contents[filename] = {
@@ -461,6 +469,9 @@ class MHTMLExtractor:
             no_css=no_css,
             no_images=no_images,
             html_only=html_only,
+            resource_info=self._resource_info,
+            archive_location=self._archive_location,
+            written_filenames=self._written_filenames if self._resource_info else None,
         )
 
     def extract(self, no_css: bool = False, no_images: bool = False, html_only: bool = False) -> ExtractionStats:
@@ -519,6 +530,9 @@ class MHTMLExtractor:
                                     no_images,
                                     html_only,
                                 )
+                            else:
+                                outer_headers = re.split(r"\r?\n\r?\n", part, maxsplit=1)[0]
+                                self._archive_location = self._get_header_value(outer_headers, "Content-Location")
                             self.extracted_count += 1
 
                 if temp_buffer_chunks and self.boundary:
@@ -526,7 +540,7 @@ class MHTMLExtractor:
                     if remaining_part and remaining_part != "--":
                         self._process_part(remaining_part, no_css, no_images, html_only)
 
-            if not self.dry_run and not html_only and self.saved_html_files:
+            if not self.dry_run and not html_only and any(self._text_rewrite_eligibility.values()):
                 self._update_all_html_links(no_css, no_images, html_only)
 
             self.stats.extraction_time = time.time() - start_time
@@ -540,25 +554,24 @@ class MHTMLExtractor:
 
     def _update_all_html_links(self, no_css: bool, no_images: bool, html_only: bool) -> None:
         """
-        Update links in all saved HTML files.
+        Update references in safely decoded, saved HTML and CSS files.
 
         Args:
             no_css: Skip CSS link updates.
             no_images: Skip image link updates.
             html_only: Skip all link updates.
         """
-        disk_mapping = {
-            url: filename for url, filename in self.url_mapping.items()
-            if filename in self._written_filenames
-        }
         self.stats.rewrite_failures += update_extracted_html_links(
             self.output_dir,
-            [filename for filename in self.saved_html_files
+            [filename for filename in self._resource_info
              if self._text_rewrite_eligibility.get(filename, False)],
-            disk_mapping,
+            self.url_mapping,
             no_css,
             no_images,
             html_only,
+            resource_info=self._resource_info,
+            archive_location=self._archive_location,
+            written_filenames=self._written_filenames,
         )
 
     def _log_extraction_summary(self) -> None:
@@ -577,7 +590,7 @@ class MHTMLExtractor:
         logging.info(f"  Skipped files: {self.stats.skipped_files}")
         logging.info(f"  Filtered files: {self.stats.filtered_files}")
         logging.info(f"  Failed files: {self.stats.failed_files}")
-        logging.info(f"  HTML rewrite failures: {self.stats.rewrite_failures}")
+        logging.info(f"  HTML/CSS rewrite failures: {self.stats.rewrite_failures}")
         logging.info(f"  Total size: {self.stats.total_size:,} bytes")
         logging.info(f"  Extraction time: {self.stats.extraction_time:.2f} seconds")
 

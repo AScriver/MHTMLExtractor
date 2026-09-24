@@ -1,13 +1,13 @@
-"""HTML link update helpers."""
+"""Atomic static HTML/CSS reference rewriting."""
 
-import html
 import logging
 import os
 import tempfile
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Set
 
-from .constants import IMAGE_EXTENSIONS
+from .reference_syntax import rewrite_css, rewrite_html
+from .reference_urls import References, ResourceInfo
 
 
 def update_html_links(
@@ -17,13 +17,16 @@ def update_html_links(
     no_css: bool = False,
     no_images: bool = False,
     html_only: bool = False,
+    resource_info: Optional[Dict[str, ResourceInfo]] = None,
+    archive_location: Optional[str] = None,
+    written_filenames: Optional[Set[str]] = None,
 ) -> None:
     """
     Update links in an HTML file to point at extracted resource filenames.
 
     Args:
         filepath: Path to the HTML file.
-        sorted_urls: URLs sorted by descending length for stable replacement.
+        sorted_urls: Selected URL keys (legacy argument; ordering is immaterial).
         url_mapping: Mapping from original URLs to extracted filenames.
         no_css: Skip CSS link updates if True.
         no_images: Skip image link updates if True.
@@ -32,30 +35,24 @@ def update_html_links(
     if html_only:
         return
 
-    with filepath.open("r", encoding="utf-8") as html_file:
-        content = html_file.read()
+    metadata = resource_info or {}
+    references = References({url: url_mapping[url] for url in sorted_urls}, metadata,
+                            archive_location, written_filenames, no_css, no_images)
+    _update_file(filepath, references, metadata.get(filepath.name))
 
-    original_content = content
 
-    for original_url in sorted_urls:
-        new_filename = url_mapping[original_url]
-
-        if no_css and new_filename.lower().endswith(".css"):
-            continue
-
-        if no_images and any(new_filename.lower().endswith(ext) for ext in IMAGE_EXTENSIONS):
-            continue
-
-        html_escaped_url = html.escape(original_url)
-        content = content.replace(html_escaped_url, new_filename)
-        if html_escaped_url != original_url:
-            content = content.replace(original_url, new_filename)
+def _update_file(filepath: Path, references: References, info: Optional[ResourceInfo]) -> None:
+    # No universal-newline conversion: unchanged source spans retain their bytes.
+    original_content = filepath.read_bytes().decode("utf-8")
+    rewrite = references.for_file(info.location if info else None)
+    content = (rewrite_css(original_content, rewrite) if info and info.content_type == "text/css"
+               else rewrite_html(original_content, rewrite))
 
     if content != original_content:
         temporary_path = None
         try:
             with tempfile.NamedTemporaryFile(
-                mode="w", encoding="utf-8", dir=str(filepath.parent),
+                mode="w", encoding="utf-8", newline="", dir=str(filepath.parent),
                 prefix=f".{filepath.name}.", suffix=".tmp", delete=False,
             ) as html_file:
                 temporary_path = Path(html_file.name)
@@ -67,7 +64,7 @@ def update_html_links(
                 try:
                     temporary_path.unlink()
                 except OSError as cleanup_error:
-                    logging.error(f"Could not remove incomplete HTML rewrite {temporary_path}: {cleanup_error}")
+                    logging.error(f"Could not remove incomplete reference rewrite {temporary_path}: {cleanup_error}")
         logging.debug(f"Updated links in {filepath.name}")
 
 def update_all_html_links(
@@ -77,30 +74,36 @@ def update_all_html_links(
     no_css: bool,
     no_images: bool,
     html_only: bool,
+    resource_info: Optional[Dict[str, ResourceInfo]] = None,
+    archive_location: Optional[str] = None,
+    written_filenames: Optional[Set[str]] = None,
 ) -> int:
     """
-    Update links in all saved HTML files.
+    Update references in eligible saved HTML/CSS files. Historical names are
+    retained for compatibility; callers provide only safe source files, but
+    all selected mappings, including targets whose writes failed.
 
     Args:
-        output_dir: Directory containing saved HTML files.
-        saved_html_files: Filenames of extracted HTML files.
+        output_dir: Directory containing saved HTML/CSS files.
+        saved_html_files: Filenames of eligible extracted HTML/CSS files.
         url_mapping: Mapping from original URLs to extracted filenames.
         no_css: Skip CSS link updates.
         no_images: Skip image link updates.
         html_only: Skip all link updates.
     """
-    if not url_mapping:
+    if html_only:
         return 0
 
-    sorted_urls = sorted(url_mapping.keys(), key=len, reverse=True)
-    logging.info(f"Updating links in {len(saved_html_files)} HTML files...")
+    metadata = resource_info or {}
+    references = References(url_mapping, metadata, archive_location, written_filenames, no_css, no_images)
+    logging.info(f"Updating static references in {len(saved_html_files)} HTML/CSS files...")
 
     failures = 0
     for filename in saved_html_files:
         filepath = output_dir / filename
         try:
-            update_html_links(filepath, sorted_urls, url_mapping, no_css, no_images, html_only)
+            _update_file(filepath, references, metadata.get(filename))
         except Exception as error:
             failures += 1
-            logging.error(f"Failed to rewrite HTML links in {filepath}: {error}")
+            logging.error(f"Failed to rewrite static references in {filepath}: {error}")
     return failures
