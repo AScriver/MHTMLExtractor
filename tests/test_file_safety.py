@@ -117,7 +117,8 @@ class FileSafetyTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="mhtml-a61-")
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        # Match the extractor's canonical paths when TEMP contains an alias.
+        self.root = Path(self.temporary.name).resolve()
 
     def archive_and_output(self, name="case", **options):
         case = self.root / name
